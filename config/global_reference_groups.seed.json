@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "name": "丝袜",
+      "target": "positive",
+      "enabled": true,
+      "pool": "black thighhighs,white thighhighs,garter belt,pantyhose,sheer stockings,suspender straps,lace-trimmed legwear,shiny stockings,white pantyhose,black pantyhose,lace top,garter straps,slim legs,beautiful legs,smooth texture"
+    },
+    {
+      "name": "光影氛围",
+      "target": "positive",
+      "enabled": true,
+      "pool": "soft lighting, cinematic lighting, rim light, soft backlight, window light, golden hour lighting, volumetric lighting, soft glow, dreamy atmosphere, romantic atmosphere"
+    },
+    {
+      "name": "质感",
+      "target": "positive",
+      "enabled": true,
+      "pool": "soft smooth skin, matte skin, silky skin, detailed stocking texture, soft fabric texture, delicate lace texture, clean thick lineart, sharp outlines, smooth rendering, fine hair strands"
+    },
+    {
+      "name": "构图视角",
+      "target": "positive",
+      "enabled": true,
+      "pool": "front view, side view, back view, three quarter view, top view, slight top view, high angle, low angle, eye level view, full body view"
+    },
+    {
+      "name": "表情情绪",
+      "target": "positive",
+      "enabled": true,
+      "pool": "soft smile, shy smile, light blush, embarrassed expression, bashful expression, excited expression, happy smile, teasing smile, seductive smile, flushed face"
+    }
+  ]
+}

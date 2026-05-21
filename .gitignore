@@ -1,0 +1,41 @@
+# ========== 前端（勿提交依赖与构建产物）==========
+node_modules/
+**/node_modules/
+frontEnd/dist/
+frontEnd/dist-ssr/
+frontend/dist/
+*.local
+
+# ========== Python 后端（勿提交虚拟环境与缓存）==========
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# backEnd / backend 目录均适用（项目实际代码在 backEnd）
+backEnd/.venv/
+backend/.venv/
+
+# ========== 日志与本地输出 ==========
+logs/
+*.log
+
+# ========== 密钥 ==========
+config/civitai_token.txt
+**/civitai_token.txt
+
+# ========== 编辑器与系统 ==========
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db

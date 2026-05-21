@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "fixed": {
+    "positive": { "prefix": "", "suffix": "" },
+    "negative": { "prefix": "", "suffix": "" }
+  },
+  "random_groups": []
+}

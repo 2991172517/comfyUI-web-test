@@ -1,0 +1,3 @@
+# 将 Civitai API Key 粘贴在下一行（不要引号），保存为 civitai_token.txt
+# 或在启动后端前设置环境变量：CIVITAI_API_TOKEN=你的密钥
+# 创建地址：https://civitai.com/user/account → API Keys

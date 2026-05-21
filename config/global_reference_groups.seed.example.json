@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "comment": "复制为 global_reference_groups.seed.json 后填写，再运行 scripts/seed_global_reference_groups.py",
+  "groups": [
+    {
+      "name": "示例组名-丝袜",
+      "target": "positive",
+      "enabled": true,
+      "pool": "black pantyhose, white pantyhose, bare legs"
+    },
+    {
+      "name": "示例组名-多方案",
+      "target": "positive",
+      "enabled": true,
+      "schemes": [
+        "nun, church, stained glass",
+        "school uniform, classroom, desk"
+      ]
+    }
+  ]
+}

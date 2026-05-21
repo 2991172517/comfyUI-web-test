@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "template_id": "First_api",
+  "is_master": false,
+  "variant_id": "test_chain_edit",
+  "display_name": "链测试",
+  "style_enabled": false,
+  "style_enabled_default": false,
+  "topology": {
+    "checkpoint_node": "1",
+    "clip_set_last_layer": "2",
+    "lora_slots": [
+      {
+        "node_id": "15",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "角色 LoRA"
+      },
+      {
+        "node_id": "17",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "角色 LoRA"
+      }
+    ],
+    "positive_encode": {
+      "node_id": "3",
+      "clip_source_node": "17"
+    },
+    "negative_encode": {
+      "node_id": "4",
+      "clip_source_node": "17"
+    },
+    "ksampler_pass1": "5",
+    "ksampler_pass2": "14",
+    "save_image": "8",
+    "style_bypass_when_disabled": {
+      "node_id": "16",
+      "fallback_node_id": "17",
+      "rewire": [
+        {
+          "target_node": "4",
+          "input_key": "clip",
+          "source": [
+            "17",
+            1
+          ]
+        },
+        {
+          "target_node": "5",
+          "input_key": "model",
+          "source": [
+            "17",
+            0
+          ]
+        },
+        {
+          "target_node": "14",
+          "input_key": "model",
+          "source": [
+            "17",
+            0
+          ]
+        }
+      ]
+    },
+    "future_conditioning_style": {
+      "enabled": false,
+      "insert_between": {
+        "after_positive_encode": "3",
+        "before_ksampler": "5"
+      },
+      "node_class_types": [
+        "IPAdapter",
+        "IPAdapterApply",
+        "StyleModelApply",
+        "ApplyStyleModel"
+      ]
+    }
+  }
+}

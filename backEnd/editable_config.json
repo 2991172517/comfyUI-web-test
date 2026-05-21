@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "class_types": ["CLIPTextEncode"],
+      "fields": ["text"],
+      "group": "提示词"
+    },
+    {
+      "class_types": ["KSampler"],
+      "fields": ["seed", "steps", "cfg", "sampler_name", "scheduler"],
+      "group": "采样"
+    },
+    {
+      "class_types": ["EmptyLatentImage"],
+      "fields": ["width", "height", "batch_size"],
+      "group": "尺寸"
+    },
+    {
+      "class_types": ["CheckpointLoaderSimple"],
+      "fields": ["ckpt_name"],
+      "group": "模型"
+    },
+    {
+      "class_types": ["LoraLoader", "LoraLoaderModelOnly"],
+      "fields": ["lora_name", "strength_model", "strength_clip"],
+      "group": "LoRA"
+    }
+  ]
+}

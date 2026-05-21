@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "id": "global-fd7835b1",
+      "name": "丝袜",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, thighhighs, lace stockings, fishnet stockings, garter stockings"
+      ]
+    },
+    {
+      "id": "global-931088b0",
+      "name": "光影氛围",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "soft lighting, cinematic lighting, rim light, soft backlight, window light, golden hour lighting, volumetric lighting, soft glow, dreamy atmosphere, romantic atmosphere"
+      ]
+    },
+    {
+      "id": "global-b056eb1c",
+      "name": "质感",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "soft smooth skin, matte skin, silky skin, detailed stocking texture, soft fabric texture, delicate lace texture, clean thick lineart, sharp outlines, smooth rendering, fine hair strands"
+      ]
+    },
+    {
+      "id": "global-51449afa",
+      "name": "视角",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "front view,side view,back view,three‑quarter view,oblique view,from below,from above,slightly low angle,slightly high angle,straight‑on view"
+      ]
+    },
+    {
+      "id": "global-23bfcfe1",
+      "name": "表情情绪",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "soft smile, shy smile, light blush, embarrassed expression, bashful expression, excited expression, happy smile, teasing smile, seductive smile, flushed face"
+      ]
+    },
+    {
+      "id": "global-g_mpebvi6z_6de1",
+      "name": "构图",
+      "enabled": true,
+      "target": "positive",
+      "prompts": [
+        "full body shot,full body view,full body portrait,full body framing,full body composition,standing full body,full body from head to toe,full body with legs visible,full body centered,full body on simple background"
+      ]
+    }
+  ]
+}

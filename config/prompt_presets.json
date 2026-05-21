@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "presets": [
+    {
+      "id": "226d2df3",
+      "name": "测试预设",
+      "description": "",
+      "fixed": {
+        "positive": {
+          "prefix": "masterpiece, best quality, absurdres,\n1girl, solo,\n(mature big sister:1.25), (gentle onee-san:1.2), elegant mature woman,\ngolden blonde long hair, side-swept hair covering one eye,\ngreen eyes, droopy eyes, teasing smile,\nvoluptuous figure, large breasts, tight clothes,\nslim narrow waist, gently wide hips,\n(long slender legs:1.2), tall body proportion, beautiful leg curves,\nblack off-shoulder nun dress, exposed shoulders, tight robe,\nlong black skirt with side slit,\ngolden crucifix necklace,\nstanding gracefully, slight contrapposto,\nthighhighs, window light, soft fabric texture,\nfrom below, full body centered, simple background",
+          "suffix": ""
+        },
+        "negative": {
+          "prefix": "lowres, worst quality, blurry, deformed, bad anatomy, extra fingers, bad hands, cropped, close-up, upper body, huge breasts, ugly, messy background",
+          "suffix": ""
+        }
+      },
+      "random_groups": [],
+      "updated_at": "2026-05-21T14:22:13.629100+00:00",
+      "positive": "",
+      "negative": "",
+      "merge": {
+        "global_before_workflow": false,
+        "random_before_workflow": true
+      }
+    }
+  ]
+}
