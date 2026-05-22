@@ -3,6 +3,24 @@
 按顺序启动三个服务：**ComfyUI → 后端 → 前端**。  
 以下路径以 ComfyUI 仓库根目录 `E:\ComfyUI-aki-v3\ComfyUI` 为例，请按你的实际路径调整。
 
+## 拉取仓库后的目录
+
+本仓库应放在 **ComfyUI 根目录下**（与官方 `main.py` 同级）：
+
+```text
+ComfyUI/                    ← 官方 ComfyUI（git clone）
+  main.py
+  models/
+  output/
+  CustomProject/            ← 本控制台（单独 git 仓库亦可）
+    backEnd/
+    frontEnd/
+    workflows/
+    config/
+```
+
+仅克隆 `CustomProject` 时，也需在本机安装并启动旁边的 ComfyUI，否则控制台无法生图。
+
 ---
 
 ## 端口一览
@@ -28,16 +46,18 @@
 **PowerShell：**
 
 ```powershell
-cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backend
+cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backEnd
 python -m pip install -r requirements.txt
 ```
 
 **CMD：**
 
 ```cmd
-cd /d E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backend
+cd /d E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backEnd
 python -m pip install -r requirements.txt
 ```
+
+> 目录名是 **`backEnd`**（注意大小写）。Linux / macOS 上 `backend` 会找不到路径。
 
 ### 前端
 
@@ -72,14 +92,14 @@ python main.py
 **PowerShell：**
 
 ```powershell
-cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backend
+cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backEnd
 python main.py
 ```
 
 **CMD：**
 
 ```cmd
-cd /d E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backend
+cd /d E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backEnd
 python main.py
 ```
 
@@ -126,7 +146,7 @@ cd E:\ComfyUI-aki-v3\ComfyUI; python main.py
 
 ```powershell
 # 终端 2 - 后端
-cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backend; python main.py
+cd E:\ComfyUI-aki-v3\ComfyUI\CustomProject\backEnd; python main.py
 ```
 
 ```powershell
@@ -162,17 +182,18 @@ npm run preview
 
 1. 确认终端 1 中 ComfyUI 已启动且无报错。
 2. 浏览器访问 http://127.0.0.1:8188 是否正常。
-3. 若 ComfyUI 端口不是 8188，修改 `CustomProject/backend/config.py` 中的 `COMFYUI_URL` 后重启后端。
+3. 若 ComfyUI 端口不是 8188，修改 `CustomProject/backEnd/config.py` 中的 `COMFYUI_URL` 后重启后端。
 
 ### 工作流列表为空
 
-将 **File → Export (API)** 导出的 json 放入：
+将 **File → Export (API)** 导出的 json 放入 **`CustomProject/workflows/`**（或子目录 `workflows/variants/`）：
 
 ```text
-E:\ComfyUI-aki-v3\ComfyUI\user\default\workflows_api\
+E:\ComfyUI-aki-v3\ComfyUI\CustomProject\workflows\
+E:\ComfyUI-aki-v3\ComfyUI\CustomProject\workflows\variants\
 ```
 
-例如 `参考_api.json`，列表中的 id 为文件名（不含扩展名）。
+列表中的 id 为文件名（不含扩展名），例如 `First_api`、`my_variant`。
 
 ### 前端 `npm run dev` 报错
 
@@ -188,7 +209,7 @@ npm run dev
 
 ### 后端端口 8000 被占用
 
-修改 `CustomProject/backend/config.py` 中的 `API_PORT`，并同步修改 `CustomProject/frontEnd/vite.config.js` 里 `proxy` 的 `target` 端口，然后重启后端与前端。
+修改 `CustomProject/backEnd/config.py` 中的 `API_PORT`，并同步修改 `CustomProject/frontEnd/vite.config.js` 里 `proxy` 的 `target` 端口，然后重启后端与前端。
 
 ---
 
@@ -196,9 +217,9 @@ npm run dev
 
 | 文件 | 作用 |
 |------|------|
-| `backend/config.py` | ComfyUI 地址、API 端口、工作流目录 |
-| `backend/editable_config.json` | 页面上展示哪些节点/字段 |
-| `user/default/workflows_api/*.json` | API 格式工作流文件 |
+| `backEnd/config.py` | ComfyUI 地址、API 端口 |
+| `backEnd/editable_config.json` | 页面上展示哪些节点/字段 |
+| `workflows/*.json`、`workflows/variants/*.json` | API 格式工作流 |
 | `frontEnd/vite.config.js` | 前端开发代理 `/api` → 后端 |
 
 更多功能说明见 [README.md](./README.md)。

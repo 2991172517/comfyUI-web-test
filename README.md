@@ -19,6 +19,17 @@ config/
 
 > **启动命令详见 [START.md](./START.md)**
 
+## 拉取后如何启动（速览）
+
+1. **目录**：`CustomProject` 放在 ComfyUI 根目录下（见 [START.md](./START.md)）。
+2. **首次**：`backEnd` 执行 `pip install -r requirements.txt`；`frontEnd` 执行 `npm install`。
+3. **每次使用**（三个终端，顺序不要反）：
+   - ComfyUI 根目录：`python main.py` → http://127.0.0.1:8188
+   - `CustomProject/backEnd`：`python main.py` → http://127.0.0.1:8000
+   - `CustomProject/frontEnd`：`npm run dev` → http://127.0.0.1:5173（浏览器打开此地址）
+4. 前端通过 Vite 把 `/api` 代理到后端；后端再连接 ComfyUI。  
+   详细命令、排错、生产构建见 **[START.md](./START.md)**。
+
 ## 工作流来源
 
 从 **`CustomProject/workflows/`** 读取（**File → Export (API)** 导出的 json）。
@@ -36,8 +47,8 @@ config/
 简要顺序：
 
 1. **ComfyUI**：`python main.py`（仓库根目录）→ http://127.0.0.1:8188  
-2. **后端**：`CustomProject/backEnd` → `python main.py` → http://127.0.0.1:8000  
-3. **前端**：`CustomProject/frontEnd` → `npm run dev` → http://127.0.0.1:5173  
+2. **后端**：`CustomProject/backEnd` → `python main.py` → http://127.0.0.1:8000（目录名是 `backEnd`，不是 `backend`）  
+3. **前端**：`CustomProject/frontEnd` → `npm run dev` → http://127.0.0.1:5173（开发时用此地址，不是 8000）  
 
 ## 前端结构（shadcn-vue + 路由）
 
@@ -153,4 +164,4 @@ output/custom_batch/<batch_id>/*.png            # ComfyUI 生成的图
 
 ## 配置
 
-`backEnd/config.py` 可修改 ComfyUI 地址；工作流目录默认为 `user/default/workflows_api`。
+`backEnd/config.py` 可修改 ComfyUI 地址与 API 端口；工作流目录为 `CustomProject/workflows/`（见上文）。
