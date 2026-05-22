@@ -13,7 +13,7 @@ defineProps({
   selected: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['preview', 'detail', 'regenerate', 'toggle-select'])
+const emit = defineEmits(['preview', 'detail', 'regenerate', 'save', 'toggle-select'])
 
 function imageUrl(cell) {
   return cell?.images?.[0]?.url
@@ -71,11 +71,19 @@ function imageUrl(cell) {
           #{{ cell.index ?? (matrixCols ? ia * matrixCols + ib : ia * 99 + ib) }}
           <span v-if="ia != null && ib != null"> · A{{ ia }}×B{{ ib }}</span>
         </p>
-        <div class="flex gap-1">
+        <div class="flex flex-wrap gap-1">
           <Button
             variant="outline"
             size="sm"
-            class="h-7 flex-1 text-[10px]"
+            class="h-7 flex-1 min-w-[3rem] text-[10px]"
+            @click.stop="emit('save')"
+          >
+            保存
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7 flex-1 min-w-[3rem] text-[10px]"
             @click.stop="emit('detail')"
           >
             详情
@@ -83,10 +91,10 @@ function imageUrl(cell) {
           <Button
             variant="secondary"
             size="sm"
-            class="h-7 flex-1 text-[10px]"
+            class="h-7 flex-1 min-w-[3rem] text-[10px]"
             @click.stop="emit('regenerate')"
           >
-            以此生成
+            生成
           </Button>
         </div>
       </div>

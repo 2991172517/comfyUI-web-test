@@ -9,28 +9,32 @@ export function useModelAssets(folder, modelName) {
   const previewIndex = ref(0)
 
   async function load() {
+    const f = unref(folder)
     const name = unref(modelName)
-    if (!name) {
+    if (!f || !name) {
       previews.value = []
       summary.value = null
       return
     }
     loading.value = true
     try {
-      const res = await api.getModelPreviews(folder, name)
+      const res = await api.getModelPreviews(f, name)
       previews.value = res.previews || []
       summary.value = res.summary || null
       if (previewIndex.value >= previews.value.length) previewIndex.value = 0
-    } catch {
+    } catch (e) {
       previews.value = []
       summary.value = null
+      if (import.meta.env.DEV) {
+        console.warn('[useModelAssets] load failed', f, name, e)
+      }
     } finally {
       loading.value = false
     }
   }
 
   watch(
-    () => [folder, unref(modelName)],
+    () => [unref(folder), unref(modelName)],
     load,
     { immediate: true },
   )

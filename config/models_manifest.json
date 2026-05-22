@@ -1,0 +1,309 @@
+{
+  "manifest_version": 1,
+  "exported_at": "2026-05-22T06:52:20.324526+00:00",
+  "comfyui_root": "E:\\ComfyUI-aki-v3\\ComfyUI",
+  "checkpoints": [
+    {
+      "folder": "checkpoints",
+      "name": "anima_baseV10_txt.safetensors",
+      "local_exists": true,
+      "size_bytes": 1192135096,
+      "source_url": "https://civitai.red/models/2458426/anima?modelVersionId=2945208",
+      "site": "civitai",
+      "model_id": "2458426",
+      "version_id": "2945208",
+      "has_summary": true,
+      "asset_dir": "anima_baseV10_txt"
+    },
+    {
+      "folder": "checkpoints",
+      "name": "miaomiaoHarem_v20.safetensors",
+      "local_exists": true,
+      "size_bytes": 6938040400,
+      "source_url": "https://civitai.red/models/934764/miaomiao-harem",
+      "site": "civitai",
+      "model_id": "934764",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "miaomiaoHarem_v20"
+    },
+    {
+      "folder": "checkpoints",
+      "name": "plantMilkModelSuite_walnut.safetensors",
+      "local_exists": true,
+      "size_bytes": 6938040714,
+      "source_url": "https://civitai.red/models/1162518/plant-milk-model-suite",
+      "site": "civitai",
+      "model_id": "1162518",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "plantMilkModelSuite_walnut"
+    },
+    {
+      "folder": "checkpoints",
+      "name": "rinFeatherfall_v40.safetensors",
+      "local_exists": true,
+      "size_bytes": 6938041304,
+      "source_url": "https://civitai.red/models/1516361/rin-featherfall-illustrious",
+      "site": "civitai",
+      "model_id": "1516361",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "rinFeatherfall_v40"
+    },
+    {
+      "folder": "checkpoints",
+      "name": "veteDreamaILL_v03.safetensors",
+      "local_exists": true,
+      "size_bytes": 6938041004,
+      "source_url": "https://civitai.red/models/2172760/vete-dreama-ill",
+      "site": "civitai",
+      "model_id": "2172760",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "veteDreamaILL_v03"
+    },
+    {
+      "folder": "checkpoints",
+      "name": "waiIllustriousSDXL_v170.safetensors",
+      "local_exists": true,
+      "size_bytes": 6938040682,
+      "source_url": "",
+      "site": "",
+      "model_id": "",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "waiIllustriousSDXL_v170"
+    }
+  ],
+  "loras": [
+    {
+      "folder": "loras",
+      "name": "Barolomeobari Style Anima-000002.safetensors",
+      "local_exists": true,
+      "size_bytes": 69497752,
+      "source_url": "https://civitai.red/models/1028254/bartolomeobari-style-illustriousxl-and-anima?modelVersionId=2921065",
+      "site": "civitai",
+      "model_id": "1028254",
+      "version_id": "2921065",
+      "has_summary": true,
+      "asset_dir": "Barolomeobari Style Anima-000002"
+    },
+    {
+      "folder": "loras",
+      "name": "Lady Labrynth of the Silver Castle illuXL v1.safetensors",
+      "local_exists": true,
+      "size_bytes": 85939668,
+      "source_url": "https://civitai.red/models/1268429/yu-gi-oh-lady-labrynth-of-the-silver-castle-alt-alt-illuxl?modelVersionId=1474283",
+      "site": "civitai",
+      "model_id": "1268429",
+      "version_id": "1474283",
+      "has_summary": true,
+      "asset_dir": "Lady Labrynth of the Silver Castle illuXL v1"
+    },
+    {
+      "folder": "loras",
+      "name": "Lovely labrynth of the silver castle illuXL v2.safetensors",
+      "local_exists": true,
+      "size_bytes": 257017764,
+      "source_url": "https://civitai.red/models/1207638/yu-gi-oh-lovely-labrynth-of-the-silver-castle-all-in-one-illuxl?modelVersionId=2503266",
+      "site": "civitai",
+      "model_id": "1207638",
+      "version_id": "2503266",
+      "has_summary": true,
+      "asset_dir": "Lovely labrynth of the silver castle illuXL v2"
+    },
+    {
+      "folder": "loras",
+      "name": "MALICE Pawn White Rabbit Anima V1.1.safetensors",
+      "local_exists": true,
+      "size_bytes": 34813072,
+      "source_url": "https://civitai.red/models/683228/yu-gi-oh-mlice-lesspgreater-white-rabbit-illuanimaponyxl?modelVersionId=2928350",
+      "site": "civitai",
+      "model_id": "683228",
+      "version_id": "2928350",
+      "has_summary": true,
+      "asset_dir": "MALICE Pawn White Rabbit Anima V1.1"
+    },
+    {
+      "folder": "loras",
+      "name": "NJ_Vector_Style.safetensors",
+      "local_exists": true,
+      "size_bytes": 114428388,
+      "source_url": "https://civitai.red/models/1388271/nj-vector-style-illustrious",
+      "site": "civitai",
+      "model_id": "1388271",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "NJ_Vector_Style"
+    },
+    {
+      "folder": "loras",
+      "name": "Nyalia_-_Style.safetensors",
+      "local_exists": true,
+      "size_bytes": 228501332,
+      "source_url": "https://civitai.red/models/1170879/nyalia-style",
+      "site": "civitai",
+      "model_id": "1170879",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "Nyalia_-_Style"
+    },
+    {
+      "folder": "loras",
+      "name": "anima_holypotato0_epoch40.safetensors",
+      "local_exists": true,
+      "size_bytes": 24272056,
+      "source_url": "https://example.com",
+      "site": "",
+      "model_id": "",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "anima_holypotato0_epoch40"
+    },
+    {
+      "folder": "loras",
+      "name": "arias the labrynth butler iluXL v1.safetensors",
+      "local_exists": true,
+      "size_bytes": 57426996,
+      "source_url": "https://civitai.red/models/935681/yu-gi-oh-arias-the-labrynth-butler-illuponyxl?modelVersionId=1409138",
+      "site": "civitai",
+      "model_id": "935681",
+      "version_id": "1409138",
+      "has_summary": true,
+      "asset_dir": "arias the labrynth butler iluXL v1"
+    },
+    {
+      "folder": "loras",
+      "name": "bikabaka.safetensors",
+      "local_exists": true,
+      "size_bytes": 228463212,
+      "source_url": "https://civitai.red/models/954817/bikabaka-style-or-nai-style",
+      "site": "civitai",
+      "model_id": "954817",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "bikabaka"
+    },
+    {
+      "folder": "loras",
+      "name": "deadpurityv2anima_v1_1-step00004000.safetensors",
+      "local_exists": true,
+      "size_bytes": 132327736,
+      "source_url": "https://civitai.red/models/2505374/deadpurity-or-style",
+      "site": "civitai",
+      "model_id": "2505374",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "deadpurityv2anima_v1_1-step00004000"
+    },
+    {
+      "folder": "loras",
+      "name": "detective silver palace.safetensors",
+      "local_exists": true,
+      "size_bytes": 228465492,
+      "source_url": "https://civitai.red/models/2472353/detectivesilverpalace",
+      "site": "civitai",
+      "model_id": "2472353",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "detective silver palace"
+    },
+    {
+      "folder": "loras",
+      "name": "eroticnansensusanima_preview3_1-step00004000.safetensors",
+      "local_exists": true,
+      "size_bytes": 132329216,
+      "source_url": "https://civitai.red/models/902780/erotic-nansensu-or-style",
+      "site": "civitai",
+      "model_id": "902780",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "eroticnansensusanima_preview3_1-step00004000"
+    },
+    {
+      "folder": "loras",
+      "name": "lazypos.safetensors",
+      "local_exists": true,
+      "size_bytes": 180376,
+      "source_url": "",
+      "site": "",
+      "model_id": "",
+      "version_id": "",
+      "has_summary": false,
+      "asset_dir": "lazypos"
+    },
+    {
+      "folder": "loras",
+      "name": "merrytailanima_preview3_1.safetensors",
+      "local_exists": true,
+      "size_bytes": 132315568,
+      "source_url": "https://civitai.red/models/976750/merrytail-or-style",
+      "site": "civitai",
+      "model_id": "976750",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "merrytailanima_preview3_1"
+    },
+    {
+      "folder": "loras",
+      "name": "nyalia_NoobXL.safetensors",
+      "local_exists": true,
+      "size_bytes": 101527340,
+      "source_url": "https://civitai.red/models/918037/artist-nyalianoob-10v-pred-05",
+      "site": "civitai",
+      "model_id": "918037",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "nyalia_NoobXL"
+    },
+    {
+      "folder": "loras",
+      "name": "ratatatat74-000005.safetensors",
+      "local_exists": true,
+      "size_bytes": 23113944,
+      "source_url": "https://civitai.red/models/2579815/ratatatat74-style-or-anima?modelVersionId=2898294",
+      "site": "civitai",
+      "model_id": "2579815",
+      "version_id": "2898294",
+      "has_summary": true,
+      "asset_dir": "ratatatat74-000005"
+    },
+    {
+      "folder": "loras",
+      "name": "takayanagi_katsuya.safetensors",
+      "local_exists": true,
+      "size_bytes": 228457500,
+      "source_url": "https://civitai.com/models/990371/takayanagi-katsuya-style-or-illustrious",
+      "site": "civitai",
+      "model_id": "990371",
+      "version_id": "",
+      "has_summary": true,
+      "asset_dir": "takayanagi_katsuya"
+    }
+  ],
+  "stats": {
+    "checkpoints_total": 6,
+    "loras_total": 17,
+    "with_source_url": 21,
+    "local_exists": 23
+  },
+  "catalog": {
+    "default_checkpoint": "",
+    "loras": {},
+    "checkpoint_lora_compat": {
+      "ckptA.safetensors": {
+        "recommended": [
+          "l1.safetensors"
+        ],
+        "not_recommended": [
+          "l2.safetensors"
+        ]
+      },
+      "anima_baseV10_txt.safetensors": {
+        "recommended": [],
+        "not_recommended": []
+      }
+    }
+  }
+}

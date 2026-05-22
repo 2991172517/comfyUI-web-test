@@ -62,21 +62,19 @@ def normalize_global_config(raw: dict | None) -> dict[str, Any]:
         "global_before_workflow": bool(merge.get("global_before_workflow", False)),
         "random_before_workflow": bool(merge.get("random_before_workflow", False)),
     }
+    from batch_prompt_service import normalize_random_group
+
     groups = []
     for g in raw.get("random_groups") or []:
-        prompts = [str(p).strip() for p in (g.get("prompts") or []) if str(p).strip()]
-        if not prompts:
+        norm = normalize_random_group(g)
+        if not norm:
             continue
-        gid = str(g.get("id") or "")
+        gid = str(norm.get("id") or "")
         if gid and not gid.startswith("global-"):
             gid = f"global-{gid}"
-        groups.append({
-            "id": gid or f"global-{len(groups)}",
-            "name": str(g.get("name") or "参考组"),
-            "enabled": bool(g.get("enabled", True)),
-            "target": g.get("target") if g.get("target") in ("positive", "negative") else "positive",
-            "prompts": prompts,
-        })
+        norm["id"] = gid or f"global-{len(groups)}"
+        norm["name"] = str(g.get("name") or norm.get("name") or "参考组")
+        groups.append(norm)
     cfg["random_groups"] = groups
     return cfg
 

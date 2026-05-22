@@ -10,7 +10,7 @@ from typing import Any
 from config import PROJECT_ROOT
 from prompt_defaults_service import load_defaults
 from prompt_merge_service import merge_text_append, patch_prompt_encode_text, resolve_encode_nodes
-from reference_pick_service import pick_random_groups
+from reference_pick_service import PICK_MODES, pick_random_groups
 
 BATCH_PROMPT_CONFIG_PATH = PROJECT_ROOT / "config" / "batch_prompt_config.json"
 
@@ -40,6 +40,37 @@ def save_batch_prompt_config(data: dict) -> dict:
     return data
 
 
+def _normalize_group_weights(prompts: list[str], raw_weights: list | None) -> list[float]:
+    weights: list[float] = []
+    for i in range(len(prompts)):
+        default = 1.0
+        if raw_weights and i < len(raw_weights):
+            try:
+                default = max(0.0, float(raw_weights[i]))
+            except (TypeError, ValueError):
+                default = 1.0
+        weights.append(default)
+    return weights
+
+
+def normalize_random_group(g: dict) -> dict | None:
+    prompts = [str(p).strip() for p in (g.get("prompts") or []) if str(p).strip()]
+    if not prompts:
+        return None
+    mode = str(g.get("pick_mode") or "random").strip().lower()
+    if mode not in PICK_MODES:
+        mode = "random"
+    return {
+        "id": str(g.get("id") or uuid.uuid4().hex[:8]),
+        "name": str(g.get("name") or "未命名组"),
+        "enabled": bool(g.get("enabled", True)),
+        "target": g.get("target") if g.get("target") in ("positive", "negative") else "positive",
+        "pick_mode": mode,
+        "prompts": prompts,
+        "weights": _normalize_group_weights(prompts, g.get("weights")),
+    }
+
+
 def normalize_batch_prompts(raw: dict | None) -> dict:
     cfg = _empty_config()
     if not raw:
@@ -53,16 +84,9 @@ def normalize_batch_prompts(raw: dict | None) -> dict:
         }
     groups = []
     for g in raw.get("random_groups") or []:
-        prompts = [str(p).strip() for p in (g.get("prompts") or []) if str(p).strip()]
-        if not prompts:
-            continue
-        groups.append({
-            "id": str(g.get("id") or uuid.uuid4().hex[:8]),
-            "name": str(g.get("name") or "未命名组"),
-            "enabled": bool(g.get("enabled", True)),
-            "target": g.get("target") if g.get("target") in ("positive", "negative") else "positive",
-            "prompts": prompts,
-        })
+        norm = normalize_random_group(g)
+        if norm:
+            groups.append(norm)
     cfg["random_groups"] = groups
     return cfg
 

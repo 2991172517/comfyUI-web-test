@@ -10,7 +10,9 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
 import { api } from '@/api/client.js'
+import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
 import { ArrowLeft, Star } from 'lucide-vue-next'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const emit = defineEmits(['back', 'preview'])
 
@@ -21,6 +23,7 @@ const router = useRouter()
 const entry = computed(() => fav.selected)
 const detailMeta = computed(() => (entry.value ? favoriteToDetailMeta(entry.value) : null))
 const detailOpen = ref(false)
+const { saveOne } = useImageDownload()
 
 async function applyGenerate() {
   if (!entry.value) return
@@ -32,7 +35,12 @@ async function removeFavorite() {
   if (!entry.value) return
   if (!confirm('取消收藏？')) return
   try {
-    await api.deleteFavorite(entry.value.id)
+    const body = favoriteEntryToTogglePayload(entry.value)
+    if (!body?.image?.filename) {
+      app.setMessage('无法取消收藏：缺少图片信息', true)
+      return
+    }
+    await api.toggleFavorite(body)
     fav.removeFromList(entry.value.id)
     app.setMessage('已取消收藏')
     emit('back')
@@ -67,6 +75,14 @@ async function removeFavorite() {
           <p class="font-mono text-xs text-muted-foreground">{{ entry.id }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <Button
+            v-if="entry.image?.url"
+            variant="outline"
+            size="sm"
+            @click="saveOne(entry.image)"
+          >
+            保存
+          </Button>
           <Button variant="outline" size="sm" @click="detailOpen = true">参数详情</Button>
           <Button size="sm" @click="applyGenerate">以此配置生成</Button>
           <IconDeleteButton title="取消收藏" @click="removeFavorite" />

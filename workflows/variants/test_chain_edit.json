@@ -250,7 +250,7 @@
   "17": {
     "class_type": "LoraLoader",
     "inputs": {
-      "lora_name": "foo.safetensors",
+      "lora_name": "takayanagi_katsuya.safetensors",
       "strength_model": 0.65,
       "strength_clip": 0.65,
       "model": [

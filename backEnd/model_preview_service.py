@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 
 from config import COMFYUI_ROOT, MODEL_PREVIEW_EXTENSIONS
@@ -71,6 +72,19 @@ def _sorted_txts_in_dir(directory: Path) -> list[Path]:
     return sorted(
         f for f in directory.iterdir() if f.is_file() and f.suffix.lower() == ".txt"
     )
+
+
+def _pick_summary_txt(txts: list[Path]) -> Path | None:
+    """优先读取导入时写入的 模型说明.txt。"""
+    if not txts:
+        return None
+    prefer_names = ("模型说明.txt", "readme.txt", "README.txt")
+    lower_map = {p.name.lower(): p for p in txts}
+    for name in prefer_names:
+        hit = lower_map.get(name.lower())
+        if hit:
+            return hit
+    return txts[0]
 
 
 def _collect_images_at(paths: list[Path], folder: str) -> list[dict]:
@@ -155,9 +169,9 @@ def read_summary_txt_for_model(folder: str, model_name: str) -> dict | None:
 
     for asset_dir in _asset_dirs_for_model(parent, filename):
         txts = _sorted_txts_in_dir(asset_dir)
-        if not txts:
+        path = _pick_summary_txt(txts)
+        if not path:
             continue
-        path = txts[0]
         try:
             raw = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -177,6 +191,87 @@ def read_summary_txt_for_model(folder: str, model_name: str) -> dict | None:
             "truncated": truncated,
         }
     return None
+
+
+def ensure_asset_dir_for_model(folder: str, model_name: str) -> Path:
+    """确保存在与模型 stem 同名的资源目录（用于写入说明与参考图）。"""
+    model_path = _model_file_path(folder, model_name)
+    if not model_path.is_file():
+        raise FileNotFoundError(f"模型文件不存在: {model_name}")
+    parent = model_path.parent
+    filename = _filename_from_key(_model_key(model_name))
+    dirs = _asset_dirs_for_model(parent, filename)
+    if dirs:
+        return dirs[0]
+    stem = Path(filename).stem
+    asset_dir = parent / stem
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    return asset_dir
+
+
+def write_summary_txt_for_model(
+    folder: str,
+    model_name: str,
+    content: str,
+    *,
+    source_url: str = "",
+) -> dict:
+    """写入或覆盖 模型说明.txt。"""
+    from model_parser.source_url_utils import format_with_source_url
+
+    asset_dir = ensure_asset_dir_for_model(folder, model_name)
+    full = format_with_source_url(source_url, (content or "").strip())
+    path = asset_dir / "模型说明.txt"
+    path.write_text(full, encoding="utf-8")
+    log.info("wrote model summary %s/%s -> %s", folder, model_name, path)
+    summary = read_summary_txt_for_model(folder, model_name)
+    return {
+        "ok": True,
+        "summary": summary,
+        "has_summary": summary is not None,
+        "asset_dir": asset_dir.name,
+    }
+
+
+def delete_model_from_disk(
+    folder: str,
+    model_name: str,
+    *,
+    delete_asset_dirs: bool = True,
+) -> dict:
+    """删除模型权重文件；可选删除同名资源目录与侧挂预览图。"""
+    model_path = _model_file_path(folder, model_name)
+    if not model_path.is_file():
+        raise FileNotFoundError(f"模型文件不存在: {model_name}")
+
+    parent = model_path.parent
+    filename = _filename_from_key(_model_key(model_name))
+    removed_dirs: list[str] = []
+    removed_files: list[str] = []
+
+    if delete_asset_dirs:
+        for asset_dir in _asset_dirs_for_model(parent, filename):
+            rel = asset_dir.name
+            shutil.rmtree(asset_dir, ignore_errors=False)
+            removed_dirs.append(rel)
+
+    for path in _sidecar_image_paths(parent, filename):
+        try:
+            path.unlink()
+            removed_files.append(path.name)
+        except OSError as e:
+            log.warning("删除侧挂预览失败 %s: %s", path, e)
+
+    model_path.unlink()
+    removed_files.append(model_path.name)
+    log.info("deleted model %s/%s dirs=%s", folder, model_name, removed_dirs)
+    return {
+        "ok": True,
+        "folder": folder,
+        "name": model_name,
+        "removed_dirs": removed_dirs,
+        "removed_files": removed_files,
+    }
 
 
 def get_model_assets(folder: str, model_name: str) -> dict:

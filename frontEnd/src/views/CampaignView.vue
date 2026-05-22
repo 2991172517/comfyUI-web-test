@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { isAdmin } from '@/composables/useAuth.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
 import PageAlert from '@/components/layout/PageAlert.vue'
 import CampaignTaskFilters from '@/components/campaign/CampaignTaskFilters.vue'
@@ -243,7 +244,7 @@ onMounted(() => refresh())
         <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
           在
           <RouterLink to="/generate?mode=sweep" class="text-primary underline font-medium">
-            生成 · LoRA 扫参
+            生成 · 批量生成
           </RouterLink>
           配置后「保存为任务」，在此勾选并串行执行；完成后可查看该任务的历史批次。
         </p>
@@ -337,6 +338,7 @@ onMounted(() => refresh())
         {{ running ? '启动中…' : `执行选中（${selected.size}）` }}
       </Button>
       <Button
+        v-if="isAdmin()"
         variant="destructive"
         size="sm"
         class="gap-1.5"
@@ -434,6 +436,7 @@ onMounted(() => refresh())
                 查看历史
               </button>
               <button
+                v-if="isAdmin()"
                 type="button"
                 class="flex-1 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors"
                 @click.stop="removeTask(t.task_id, $event)"

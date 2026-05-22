@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "default_checkpoint": "",
+  "loras": {},
+  "checkpoint_lora_compat": {
+    "ckptA.safetensors": {
+      "recommended": [
+        "l1.safetensors"
+      ],
+      "not_recommended": [
+        "l2.safetensors"
+      ]
+    },
+    "anima_baseV10_txt.safetensors": {
+      "recommended": [],
+      "not_recommended": []
+    }
+  }
+}

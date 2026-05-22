@@ -7,11 +7,14 @@ import { favoriteSourceLabel, isFromBatchGrid } from '@/lib/favoriteMeta.js'
 import { Grid3x3, ImageIcon, Star } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const emit = defineEmits(['preview'])
 
 const fav = useFavoritesPageStore()
 const app = useAppStore()
+const { saveOne } = useImageDownload()
 
 function formatTime(iso) {
   if (!iso) return '—'
@@ -31,11 +34,21 @@ function preview(ev, f) {
   if (f.image?.url) emit('preview', f)
 }
 
+function saveImage(ev, f) {
+  ev.stopPropagation()
+  if (f.image?.url) saveOne(f.image)
+}
+
 async function remove(ev, f) {
   ev.stopPropagation()
   if (!confirm('取消收藏？（仅删除记录，不删原图）')) return
   try {
-    await api.deleteFavorite(f.id)
+    const body = favoriteEntryToTogglePayload(f)
+    if (!body?.image?.filename) {
+      app.setMessage('无法取消收藏：缺少图片信息', true)
+      return
+    }
+    await api.toggleFavorite(body)
     fav.removeFromList(f.id)
     app.setMessage('已取消收藏')
   } catch (e) {
@@ -112,6 +125,14 @@ async function remove(ev, f) {
             @click="preview($event, f)"
           >
             放大
+          </button>
+          <button
+            v-if="f.image?.url"
+            type="button"
+            class="rounded-md bg-background/90 px-2 py-1 text-[10px] font-medium shadow"
+            @click="saveImage($event, f)"
+          >
+            保存
           </button>
           <IconDeleteButton size="sm" title="取消收藏" @click="remove($event, f)" />
         </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import Input from '@/components/ui/Input.vue'
+import Label from '@/components/ui/Label.vue'
 import PromptTextarea from '@/components/prompt/PromptTextarea.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -10,7 +11,9 @@ import Switch from '@/components/ui/Switch.vue'
 import {
   countCandidates,
   groupModeBadge,
+  groupModeDescription,
   randomGroupMode,
+  splitPromptTokens,
 } from '@/lib/promptTokens.js'
 import { cn } from '@/lib/utils'
 
@@ -24,31 +27,87 @@ const emit = defineEmits(['update:group', 'remove'])
 
 const mode = computed(() => randomGroupMode(props.group))
 const badgeText = computed(() => groupModeBadge(props.group))
+const modeHint = computed(() => groupModeDescription(props.group))
+const isRandom = computed(() => (props.group.pick_mode || 'random') !== 'sequential')
+const isPool = computed(() => mode.value === 'pool')
 
 function update(patch) {
   emit('update:group', { ...props.group, ...patch })
 }
 
+function syncWeights(prompts) {
+  const weights = [...(props.group.weights || [])]
+  while (weights.length < prompts.length) weights.push(1)
+  if (weights.length > prompts.length) weights.length = prompts.length
+  return weights
+}
+
 function updatePrompt(i, val) {
   const prompts = [...(props.group.prompts || [])]
   prompts[i] = val
-  update({ prompts })
+  let weights = syncWeights(prompts)
+  if (i === 0 && (prompts.filter((p) => String(p).trim()).length <= 1)) {
+    const k = splitPromptTokens(val).length || 1
+    weights = []
+    for (let j = 0; j < k; j++) weights.push((props.group.weights || [])[j] ?? 1)
+  }
+  update({ prompts, weights })
 }
 
+function updateWeight(i, val) {
+  const weights = syncWeights(props.group.prompts || [])
+  const n = Number(val)
+  weights[i] = Number.isFinite(n) && n >= 0 ? n : 1
+  update({ weights })
+}
+
+function updatePoolWeightsText(val) {
+  const line = (props.group.prompts || [])[0] || ''
+  const k = splitPromptTokens(line).length || 1
+  const parts = String(val || '')
+    .split(/[,，]\s*/)
+    .map((x) => x.trim())
+    .filter((x) => x !== '')
+  const weights = []
+  for (let i = 0; i < k; i++) {
+    const n = Number(parts[i])
+    weights.push(Number.isFinite(n) && n >= 0 ? n : 1)
+  }
+  update({ weights })
+}
+
+const poolWeightsText = computed(() => {
+  if (!isPool.value) return ''
+  const line = (props.group.prompts || [])[0] || ''
+  const k = splitPromptTokens(line).length || 1
+  const raw = props.group.weights || []
+  const out = []
+  for (let i = 0; i < k; i++) out.push(raw[i] ?? 1)
+  return out.join(', ')
+})
+
 function addCandidate() {
-  update({ prompts: [...(props.group.prompts || []), ''] })
+  const prompts = [...(props.group.prompts || []), '']
+  update({ prompts, weights: syncWeights(prompts) })
 }
 
 function removePrompt(i) {
   const prompts = [...(props.group.prompts || [])]
   prompts.splice(i, 1)
-  update({ prompts: prompts.length ? prompts : [''] })
+  const next = prompts.length ? prompts : ['']
+  update({ prompts: next, weights: syncWeights(next) })
 }
 
 function switchToPoolMode() {
   const lines = (props.group.prompts || []).map((p) => String(p).trim()).filter(Boolean)
   if (lines.length <= 1) return
-  update({ prompts: [lines.join(', ')] })
+  const merged = [lines.join(', ')]
+  update({ prompts: merged, weights: syncWeights(merged) })
+}
+
+function onPickModeChange(val) {
+  const pick_mode = val === 'sequential' ? 'sequential' : 'random'
+  update({ pick_mode })
 }
 </script>
 
@@ -86,7 +145,17 @@ function switchToPoolMode() {
         <option value="positive">正向</option>
         <option value="negative">负向</option>
       </SelectNative>
-      <Badge variant="outline" class="text-[10px] shrink-0 hidden sm:inline-flex" :title="badgeText">
+      <SelectNative
+        class="h-8 text-xs w-[4.5rem] shrink-0"
+        :model-value="group.pick_mode || 'random'"
+        :disabled="disabled"
+        title="随机：按权重抽取；顺序：按批量图序号依次取用并循环"
+        @update:model-value="onPickModeChange"
+      >
+        <option value="random">随机</option>
+        <option value="sequential">顺序</option>
+      </SelectNative>
+      <Badge variant="outline" class="text-[10px] shrink-0 hidden sm:inline-flex" :title="modeHint">
         {{ badgeText }}
       </Badge>
       <Button
@@ -108,6 +177,8 @@ function switchToPoolMode() {
       />
     </div>
 
+    <p class="text-[10px] text-muted-foreground leading-snug">{{ modeHint }}</p>
+
     <template v-if="mode === 'pool'">
       <PromptTextarea
         :model-value="(group.prompts || [])[0] || ''"
@@ -115,8 +186,18 @@ function switchToPoolMode() {
         class="text-xs font-mono"
         :disabled="disabled"
         placeholder="词条池，英文或中文逗号分隔"
-        @update:model-value="update({ prompts: [$event] })"
+        @update:model-value="updatePrompt(0, $event)"
       />
+      <div v-if="isRandom" class="space-y-1">
+        <Label class="text-[10px] text-muted-foreground">词条权重（逗号分隔，与词条顺序对应，默认 1）</Label>
+        <Input
+          class="h-8 text-xs font-mono"
+          :model-value="poolWeightsText"
+          :disabled="disabled"
+          placeholder="如 1, 5, 1, 2"
+          @update:model-value="updatePoolWeightsText"
+        />
+      </div>
     </template>
 
     <template v-else>
@@ -134,6 +215,17 @@ function switchToPoolMode() {
             :disabled="disabled"
             placeholder="候选方案，逗号分隔多个 tag"
             @update:model-value="updatePrompt(i, $event)"
+          />
+          <Input
+            v-if="isRandom"
+            type="number"
+            min="0"
+            step="0.1"
+            class="h-8 w-14 shrink-0 text-xs text-center"
+            :model-value="(group.weights || [])[i] ?? 1"
+            :disabled="disabled"
+            title="随机权重，越大越容易被抽到"
+            @update:model-value="updateWeight(i, $event)"
           />
           <IconDeleteButton
             size="sm"

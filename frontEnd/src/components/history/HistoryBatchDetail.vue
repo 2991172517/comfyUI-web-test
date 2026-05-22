@@ -22,6 +22,8 @@ import { buildCellDetailMeta } from '@/lib/cellDetailMeta.js'
 import { cellSelectionKey, cellSelectionLabel } from '@/lib/promptCompare.js'
 import { buildBatchFavoritePayload } from '@/utils/favoritePayload.js'
 import { ArrowLeft, GitCompare, Trash2 } from 'lucide-vue-next'
+import { isAdmin } from '@/composables/useAuth.js'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const emit = defineEmits(['back', 'deleted'])
 
@@ -36,6 +38,7 @@ const detailImageUrl = ref('')
 const selectMode = ref(false)
 const selectedKeys = ref(new Set())
 const compareOpen = ref(false)
+const { saveOne, saveAll } = useImageDownload()
 
 const colsPerRow = ref(5)
 
@@ -257,6 +260,21 @@ async function deleteSelectedCells() {
   }
 }
 
+function batchImagesForDownload() {
+  return flatCells.value
+    .map(({ cell }) => cellImage(cell))
+    .filter((img) => img?.url)
+}
+
+function saveAllBatchImages() {
+  saveAll(batchImagesForDownload(), entry.value?.batch_id || 'batch')
+}
+
+function saveCellImage(cell) {
+  const img = cellImage(cell)
+  if (img?.url) saveOne(img)
+}
+
 async function deleteWholeBatch() {
   const id = entry.value?.batch_id
   if (!id) return
@@ -307,6 +325,7 @@ async function deleteWholeBatch() {
         <HistoryMetaPanel class="mt-4" :meta="entry.meta" :workflow-id="entry.workflow_id" />
         <div class="mt-3 flex flex-wrap gap-2">
           <Button
+            v-if="isAdmin()"
             variant="destructive"
             size="sm"
             class="gap-1.5"
@@ -336,6 +355,15 @@ async function deleteWholeBatch() {
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <Button
+              variant="outline"
+              size="sm"
+              class="text-xs"
+              :disabled="!batchImagesForDownload().length"
+              @click="saveAllBatchImages"
+            >
+              全部保存
+            </Button>
+            <Button
               :variant="selectMode ? 'default' : 'outline'"
               size="sm"
               class="gap-1 text-xs"
@@ -358,6 +386,7 @@ async function deleteWholeBatch() {
                 清空
               </Button>
               <Button
+                v-if="isAdmin()"
                 variant="destructive"
                 size="sm"
                 class="gap-1 text-xs"
@@ -426,6 +455,7 @@ async function deleteWholeBatch() {
                 @preview="cell && openCellLightbox(cell)"
                 @detail="cell && openCellDetail(cell, ia, ib)"
                 @regenerate="cell && regenerateFromCell(cell)"
+                @save="cell && saveCellImage(cell)"
                 @toggle-select="toggleCellSelect(cell, ia, ib)"
               />
             </template>
@@ -447,6 +477,7 @@ async function deleteWholeBatch() {
               @preview="cell && openCellLightbox(cell)"
               @detail="cell && openCellDetail(cell, ia, ib)"
               @regenerate="cell && regenerateFromCell(cell)"
+              @save="cell && saveCellImage(cell)"
               @toggle-select="toggleCellSelect(cell, ia, ib)"
             />
           </div>

@@ -1,10 +1,13 @@
-import { computed, inject, onUnmounted, provide, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { api } from '@/api/client.js'
 import { buildFavoriteFilterOptions, filterFavorites } from '@/lib/favoriteMeta.js'
 
-const FAVORITES_PAGE_STORE = Symbol('favoritesPageStore')
+/** 收藏页全局 store（单例，避免 RouterView 与 provide/inject 层级问题） */
+let favoritesPageStore = null
 
 export function createFavoritesPageStore() {
+  if (favoritesPageStore) return favoritesPageStore
+
   const allItems = ref([])
   const loading = ref(false)
   const selected = ref(null)
@@ -55,7 +58,7 @@ export function createFavoritesPageStore() {
     if (selected.value?.id === id) selected.value = null
   }
 
-  const store = reactive({
+  favoritesPageStore = reactive({
     allItems,
     loading,
     selected,
@@ -70,18 +73,9 @@ export function createFavoritesPageStore() {
     removeFromList,
   })
 
-  provide(FAVORITES_PAGE_STORE, store)
-  onUnmounted(() => {
-    /* page-scoped */
-  })
-
-  return store
+  return favoritesPageStore
 }
 
 export function useFavoritesPageStore() {
-  const store = inject(FAVORITES_PAGE_STORE, null)
-  if (!store) {
-    throw new Error('useFavoritesPageStore() 需在 FavoritesView 内使用 createFavoritesPageStore()')
-  }
-  return store
+  return createFavoritesPageStore()
 }

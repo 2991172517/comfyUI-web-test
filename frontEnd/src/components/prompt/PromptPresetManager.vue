@@ -23,6 +23,7 @@ import {
   serializePromptConfig,
 } from '@/composables/usePromptConfig.js'
 import { cn } from '@/lib/utils'
+import { isAdmin } from '@/composables/useAuth.js'
 
 defineProps({
   embedded: { type: Boolean, default: false },
@@ -201,6 +202,7 @@ onMounted(async () => {
                 </div>
               </button>
               <IconDeleteButton
+                v-if="isAdmin()"
                 size="sm"
                 class="mr-1"
                 title="删除预设"

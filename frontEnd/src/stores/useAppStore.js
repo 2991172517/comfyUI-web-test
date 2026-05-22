@@ -1,6 +1,7 @@
 import { inject, onUnmounted, provide, reactive, ref } from 'vue'
 import { api, GROUP_HINTS, statusLabel } from '@/api/client.js'
 import { useFavorites } from '@/composables/useFavorites.js'
+import { applyQuotaFromApi } from '@/composables/useAuth.js'
 import {
   applyPromptConfigTo,
   emptyBatchPromptConfig,
@@ -151,6 +152,19 @@ export function createAppStore() {
 
   function isGeneratingNow() {
     return ['pending', 'in_progress', 'finalizing'].includes(job.status)
+  }
+
+  /** 当前工作流中选中的 Checkpoint（ckpt_name） */
+  function getActiveCheckpointName() {
+    for (const node of state.nodes || []) {
+      for (const field of node.fields || []) {
+        if (field.key === 'ckpt_name') {
+          const v = fieldValue(node.id, field)
+          return String(v || '').trim()
+        }
+      }
+    }
+    return ''
   }
 
   function groupHint(group) {
@@ -402,7 +416,12 @@ export function createAppStore() {
   async function pollJobUntilDone(promptId) {
     const detail = await api.getJob(promptId)
     applyJobDetail(detail)
-    if (detail.status === 'failed' || detail.status === 'cancelled') {
+    if (detail.status === 'cancelled') {
+      stopPoll()
+      setMessage(job.message || '已取消生成')
+      return
+    }
+    if (detail.status === 'failed') {
       stopPoll()
       setMessage(job.message || '生成失败', true)
       return
@@ -445,6 +464,22 @@ export function createAppStore() {
     sessionPromptPresetName.value = ''
   }
 
+  async function cancelWorkflow() {
+    if (!job.promptId || !isGeneratingNow()) return
+    try {
+      await api.cancelJob(job.promptId)
+      stopPoll()
+      job.status = 'cancelled'
+      job.statusText = statusLabel('cancelled')
+      job.message = '已取消生成'
+      job.currentNode = null
+      job.progress = null
+      setMessage('已取消当前生成任务')
+    } catch (e) {
+      setMessage(e.message, true)
+    }
+  }
+
   async function queueWorkflow() {
     if (!selectedId.value || isGeneratingNow()) return
     loading.value = true
@@ -472,6 +507,7 @@ export function createAppStore() {
         statusText: statusLabel('pending'),
         message: '已提交，等待 ComfyUI 执行…',
       })
+      applyQuotaFromApi(res)
       setMessage(`已提交，任务 ID: ${job.promptId}`)
       startJobPolling(job.promptId)
     } catch (e) {
@@ -546,6 +582,9 @@ export function createAppStore() {
     get isGenerating() {
       return isGeneratingNow()
     },
+    get activeCheckpointName() {
+      return getActiveCheckpointName()
+    },
     get workflowLorasForUi() {
       return workflowLoras.value
     },
@@ -562,6 +601,7 @@ export function createAppStore() {
     modelCatalogForFolder,
     modelSelectMissing,
     fieldValue,
+    getActiveCheckpointName,
     updateField,
     refreshHealth,
     loadModelLists,
@@ -575,6 +615,7 @@ export function createAppStore() {
     applyWorkflowSnapshot,
     saveWorkflow,
     queueWorkflow,
+    cancelWorkflow,
     deleteOutputs,
     resetJob,
     stopPoll,

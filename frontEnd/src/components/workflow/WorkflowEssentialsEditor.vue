@@ -15,6 +15,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Alert from '@/components/ui/Alert.vue'
 import ModelVisualPicker from '@/components/models/ModelVisualPicker.vue'
 import { cn } from '@/lib/utils'
+import { isAdmin } from '@/composables/useAuth.js'
 
 const props = defineProps({
   workflowId: { type: String, required: true },
@@ -197,7 +198,7 @@ function goGenerate() {
               <span class="text-xs text-muted-foreground">节点 {{ l.node_id }}</span>
             </div>
             <Button
-              v-if="l.can_remove"
+              v-if="l.can_remove && isAdmin()"
               variant="ghost"
               size="sm"
               class="text-destructive hover:text-destructive"

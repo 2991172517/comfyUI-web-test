@@ -1,0 +1,69 @@
+{
+  "admins": [
+    {
+      "id": "1",
+      "username": "qwer",
+      "password_hash": "4cda96247e96e1b4487b4881e84e38ad617d18e1a74ff8461afe481bd3e40510",
+      "enabled": true,
+      "note": "默认管理员，密码 admin123（请尽快修改 password_hash 或禁用此账号）"
+    }
+  ],
+  "invites": [
+    {
+      "id": "1",
+      "code": "COMFY-8K2M",
+      "note": "邀请码示例",
+      "expires_at": null,
+      "max_uses": 3,
+      "single_quota_per_login": 2,
+      "used_count": 2,
+      "enabled": true,
+      "created_at": "2026-05-21T00:00:00+00:00",
+      "last_used_at": "2026-05-21T16:37:00.519662+00:00"
+    },
+    {
+      "id": "2",
+      "code": "COMFY-5N9P",
+      "note": "邀请码 2",
+      "expires_at": null,
+      "max_uses": 1,
+      "single_quota_per_login": 5,
+      "used_count": 0,
+      "enabled": true,
+      "created_at": "2026-05-21T00:00:00+00:00"
+    },
+    {
+      "id": "3",
+      "code": "COMFY-3R7Q",
+      "note": "邀请码 3",
+      "expires_at": null,
+      "max_uses": 1,
+      "single_quota_per_login": 5,
+      "used_count": 0,
+      "enabled": true,
+      "created_at": "2026-05-21T00:00:00+00:00"
+    },
+    {
+      "id": "4",
+      "code": "COMFY-1W4X",
+      "note": "邀请码 4",
+      "expires_at": null,
+      "max_uses": 1,
+      "single_quota_per_login": 5,
+      "used_count": 0,
+      "enabled": true,
+      "created_at": "2026-05-21T00:00:00+00:00"
+    },
+    {
+      "id": "5",
+      "code": "COMFY-6H8J",
+      "note": "邀请码 5",
+      "expires_at": null,
+      "max_uses": 1,
+      "single_quota_per_login": 5,
+      "used_count": 0,
+      "enabled": true,
+      "created_at": "2026-05-21T00:00:00+00:00"
+    }
+  ]
+}

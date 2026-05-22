@@ -10,6 +10,7 @@ import Badge from '@/components/ui/Badge.vue'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useFavorites } from '@/composables/useFavorites.js'
+import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
 
 const emit = defineEmits(['apply'])
 
@@ -36,8 +37,14 @@ function applyToWorkflow(fav) {
 
 async function remove(id) {
   if (!confirm('取消收藏？（仅删除记录，不删原图）')) return
+  const entry = favorites.value.find((f) => f.id === id)
+  const body = favoriteEntryToTogglePayload(entry)
+  if (!body?.image?.filename) {
+    app.setMessage('无法取消收藏：缺少图片信息', true)
+    return
+  }
   try {
-    await api.deleteFavorite(id)
+    await api.toggleFavorite(body)
     await load()
     app.setMessage('已取消收藏')
   } catch (e) {

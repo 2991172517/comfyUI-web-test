@@ -34,6 +34,8 @@ export function createBatchStore(app) {
     seedMode: 'fixed',
     seed: 0,
     syncClip: true,
+    /** 无 LoRA 扫参时的重复张数（1–12） */
+    repeatCount: 1,
     filenameTemplate: DEFAULT_FILENAME_TEMPLATE,
   })
 
@@ -75,10 +77,13 @@ export function createBatchStore(app) {
           count: 4,
           fixedModel: l.strength_model ?? 1,
           fixedClip: l.strength_clip ?? 1,
+          syncPair: true,
           loraName: l.lora_name || '',
         }
       } else {
-        loraAxisState[l.node_id].loraName = l.lora_name || loraAxisState[l.node_id].loraName
+        const st = loraAxisState[l.node_id]
+        st.loraName = l.lora_name || st.loraName
+        if (st.syncPair === undefined) st.syncPair = true
       }
     }
     reassignSweepRoles()
@@ -118,9 +123,16 @@ export function createBatchStore(app) {
     return app.workflowLoras.filter((l) => loraAxisState[l.node_id]?.enabled)
   }
 
+  function sweepAxesEnabled() {
+    return enabledSweepLoras().length > 0
+  }
+
   function plannedBatchTotal() {
     const en = enabledSweepLoras()
-    if (!en.length) return 0
+    if (!en.length) {
+      const n = Math.round(Number(form.repeatCount) || 1)
+      return Math.max(1, Math.min(12, n))
+    }
     const counts = en.map((l) => Math.max(1, loraAxisState[l.node_id]?.count || 1))
     if (counts.length === 1) return counts[0]
     return counts[0] * counts[1]
@@ -182,6 +194,7 @@ export function createBatchStore(app) {
       base[l.node_id].strength_model = st.fixedModel
       base[l.node_id].strength_clip = form.syncClip ? st.fixedModel : st.fixedClip
     }
+    const repeatCount = Math.max(1, Math.min(12, Math.round(Number(form.repeatCount) || 1)))
     return {
       base_overrides: base,
       style_enabled: app.styleEnabled,
@@ -190,6 +203,7 @@ export function createBatchStore(app) {
       seed_mode: form.seedMode,
       seed: form.seed,
       sync_clip: form.syncClip,
+      repeat_count: sweepAxesEnabled() ? undefined : repeatCount,
       save_node_id: app.workflowTargets?.save_node_id,
       seed_node_id: app.workflowTargets?.seed_node_id,
       filename_template: form.filenameTemplate,
@@ -443,6 +457,9 @@ export function createBatchStore(app) {
     batchPromptSaving,
     get plannedTotal() {
       return plannedBatchTotal()
+    },
+    get hasSweepEnabled() {
+      return sweepAxesEnabled()
     },
 
     syncLoraAxisState,

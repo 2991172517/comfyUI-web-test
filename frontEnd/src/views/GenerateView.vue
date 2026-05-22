@@ -16,13 +16,14 @@ import BatchProgress from '@/components/batch/BatchProgress.vue'
 import BatchPreviewTable from '@/components/batch/BatchPreviewTable.vue'
 import BatchResultGrid from '@/components/batch/BatchResultGrid.vue'
 import Alert from '@/components/ui/Alert.vue'
+import { allowsBatch, hasSingleQuotaLeft } from '@/composables/useAuth.js'
 
 const store = useAppStore()
 const batch = useBatchStore()
 const route = useRoute()
 const router = useRouter()
 
-const isSweep = computed(() => route.query.mode === 'sweep')
+const isSweep = computed(() => allowsBatch() && route.query.mode === 'sweep')
 const runDisabled = computed(() =>
   isSweep.value ? batch.isBatchRunning : store.isGenerating,
 )
@@ -74,16 +75,25 @@ watch(isSweep, (sweep) => {
 </script>
 
 <template>
-  <div class="space-y-4 pb-24">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+  <!-- 单张 / 批量同一页面、同一内容宽度（仅 ?mode=sweep 切换逻辑，不改布局） -->
+  <div class="mx-auto w-full max-w-7xl space-y-4 pb-24">
+    <div class="space-y-2">
       <RunModeBar />
-      <p class="text-xs text-muted-foreground max-w-xl">
-        <template v-if="isSweep">开启 LoRA 扫参后按网格批量入队；未扫参的 LoRA 使用固定权重。</template>
-        <template v-else>不扫参，按当前表单生成一张（等同 1×1 批量）。</template>
+      <p class="min-h-10 text-xs text-muted-foreground leading-relaxed">
+        <template v-if="isSweep">
+          批量模式：可 LoRA 权重扫参（A×B），或不扫参时连续生成最多 12 张。
+        </template>
+        <template v-else>
+          单张模式：按当前工作流与提示词生成一张。
+          <template v-if="!allowsBatch()">
+            <span v-if="hasSingleQuotaLeft()">（邀请码用户，本次登录额度内可用）</span>
+            <span v-else class="text-destructive">（本次登录单图额度已用尽）</span>
+          </template>
+        </template>
       </p>
     </div>
 
-    <RunConfigShell :wide="isSweep" :loading="store.loading && !store.state.nodes.length">
+    <RunConfigShell :loading="store.loading && !store.state.nodes.length">
       <template #default="{ activeModule }">
         <Alert v-if="!store.selectedId" variant="default">请选择工作流。</Alert>
         <Alert v-else-if="store.state.format !== 'api'" variant="default">
@@ -102,13 +112,13 @@ watch(isSweep, (sweep) => {
       </template>
       <template v-if="batchReady" #footer>
         <BatchRunPanel v-if="isSweep" :disabled="store.loading || !store.healthOk" />
-        <JobOutput v-if="!isSweep" />
+        <JobOutput v-else />
       </template>
     </RunConfigShell>
 
     <GenerateActionBar v-if="batchReady" :sweep="isSweep" />
 
-    <section v-if="isSweep && batchReady" class="max-w-7xl mx-auto w-full space-y-4 px-0">
+    <section v-if="isSweep && batchReady" class="w-full space-y-4">
       <BatchProgress />
       <BatchPreviewTable />
       <BatchResultGrid
@@ -117,6 +127,5 @@ watch(isSweep, (sweep) => {
         @favorite-toggled="store.setMessage('收藏已更新')"
       />
     </section>
-
   </div>
 </template>

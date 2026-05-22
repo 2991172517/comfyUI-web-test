@@ -31,8 +31,24 @@ export function newRandomGroup(name = '') {
     name: name || '新随机组',
     enabled: true,
     target: 'positive',
+    pick_mode: 'random',
     prompts: [''],
+    weights: [1],
   }
+}
+
+function normalizeWeight(value, fallback = 1) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return fallback
+  return n
+}
+
+function normalizeGroupWeights(prompts, rawWeights) {
+  const weights = []
+  for (let i = 0; i < prompts.length; i++) {
+    weights.push(normalizeWeight(rawWeights?.[i], 1))
+  }
+  return weights
 }
 
 /** @param {object} raw API / store 数据 */
@@ -54,13 +70,19 @@ export function normalizePromptConfig(raw) {
     global_before_workflow: !!merge.global_before_workflow,
     random_before_workflow: !!merge.random_before_workflow,
   }
-  base.random_groups = (raw.random_groups || []).map((g) => ({
-    id: g.id || newRandomGroup().id,
-    name: g.name || '未命名组',
-    enabled: g.enabled !== false,
-    target: g.target === 'negative' ? 'negative' : 'positive',
-    prompts: (g.prompts?.length ? g.prompts : ['']).map(String),
-  }))
+  base.random_groups = (raw.random_groups || []).map((g) => {
+    const prompts = (g.prompts?.length ? g.prompts : ['']).map(String)
+    const pickMode = g.pick_mode === 'sequential' ? 'sequential' : 'random'
+    return {
+      id: g.id || newRandomGroup().id,
+      name: g.name || '未命名组',
+      enabled: g.enabled !== false,
+      target: g.target === 'negative' ? 'negative' : 'positive',
+      pick_mode: pickMode,
+      prompts,
+      weights: normalizeGroupWeights(prompts, g.weights),
+    }
+  })
   return base
 }
 
@@ -82,7 +104,9 @@ export function serializePromptConfig(cfg) {
       name: g.name,
       enabled: !!g.enabled,
       target: g.target,
+      pick_mode: g.pick_mode === 'sequential' ? 'sequential' : 'random',
       prompts,
+      weights: normalizeGroupWeights(prompts, g.weights),
     })
   }
   return out
@@ -131,6 +155,7 @@ export function clonePromptConfig(cfg) {
     random_groups: n.random_groups.map((g) => ({
       ...g,
       prompts: [...g.prompts],
+      weights: [...(g.weights || [])],
     })),
     merge: { ...n.merge },
   }
@@ -188,7 +213,9 @@ export function serializeGlobalPromptConfig(cfg) {
           name: g.name,
           enabled: !!g.enabled,
           target: g.target,
+          pick_mode: g.pick_mode === 'sequential' ? 'sequential' : 'random',
           prompts,
+          weights: normalizeGroupWeights(prompts, g.weights),
         }
       })
       .filter(Boolean),

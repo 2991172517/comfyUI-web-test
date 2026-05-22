@@ -31,21 +31,19 @@ def save_global_reference_groups(data: dict) -> dict:
 
 
 def normalize_groups(raw: list | None) -> list[dict]:
+    from batch_prompt_service import normalize_random_group
+
     groups = []
     for g in raw or []:
-        prompts = [str(p).strip() for p in (g.get("prompts") or []) if str(p).strip()]
-        if not prompts:
+        norm = normalize_random_group(g)
+        if not norm:
             continue
-        gid = str(g.get("id") or uuid.uuid4().hex[:8])
+        gid = str(norm.get("id") or uuid.uuid4().hex[:8])
         if not gid.startswith("global-"):
             gid = f"global-{gid}"
-        groups.append({
-            "id": gid,
-            "name": str(g.get("name") or "参考组"),
-            "enabled": bool(g.get("enabled", True)),
-            "target": g.get("target") if g.get("target") in ("positive", "negative") else "positive",
-            "prompts": prompts,
-        })
+        norm["id"] = gid
+        norm["name"] = str(g.get("name") or norm.get("name") or "参考组")
+        groups.append(norm)
     return groups
 
 

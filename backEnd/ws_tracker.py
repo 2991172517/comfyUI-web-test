@@ -32,6 +32,11 @@ def clear_tracker_state(prompt_id: str) -> None:
         _states.pop(prompt_id, None)
 
 
+def mark_cancelled(prompt_id: str) -> None:
+    """用户取消单图生成时标记状态，供 get_job_detail 立即返回 cancelled。"""
+    _update(prompt_id, status="cancelled", current_node=None, progress=None, error=None)
+
+
 def _update(prompt_id: str, **fields: Any) -> None:
     with _lock:
         entry = _states.setdefault(prompt_id, {})

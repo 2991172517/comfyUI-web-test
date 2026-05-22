@@ -200,7 +200,49 @@ def _resolve_sweep_rules(body: dict, loras: list[dict]) -> tuple[dict, dict, dic
             if cfg.get("enabled"):
                 enabled.append((meta, cfg))
         if not enabled:
-            raise ValueError("请至少为 1 个 LoRA 开启「参与扫参」")
+            repeat_count = int(body.get("repeat_count") or 1)
+            if repeat_count < 1 or repeat_count > 12:
+                raise ValueError("未开启 LoRA 扫参时，生成张数须为 1–12")
+            if not loras:
+                dummy = {
+                    "node_id": "0",
+                    "short_name": "base",
+                    "lora_name": "",
+                    "strength_model": 1.0,
+                    "strength_clip": 1.0,
+                }
+                rule_a = {
+                    "node_id": "0",
+                    "alias": "base",
+                    "enabled": False,
+                    "start": 1.0,
+                    "step": 0.0,
+                    "direction": "up",
+                    "count": repeat_count,
+                }
+                rule_b = {**rule_a, "count": 1}
+                return rule_a, rule_b, dummy, dummy
+            meta_a = loras[0]
+            meta_b = loras[0] if len(loras) == 1 else loras[1]
+            rule_a = {
+                "node_id": meta_a["node_id"],
+                "alias": meta_a.get("short_name") or "A",
+                "enabled": False,
+                "start": float(meta_a.get("strength_model") or 1),
+                "step": 0.0,
+                "direction": "up",
+                "count": repeat_count,
+            }
+            rule_b = {
+                "node_id": meta_b["node_id"],
+                "alias": meta_b.get("short_name") or "B",
+                "enabled": False,
+                "start": float(meta_b.get("strength_model") or 1),
+                "step": 0.0,
+                "direction": "down",
+                "count": 1,
+            }
+            return rule_a, rule_b, meta_a, meta_b
         if len(enabled) > 2:
             raise ValueError("最多 2 个 LoRA 参与扫参（避免组合数量爆炸）")
 
@@ -486,8 +528,14 @@ def build_grid_plan(workflow_id: str, body: dict) -> dict:
                     },
                 },
                 "label": (
-                    f"{meta_a.get('short_name')}={wa:.2f}{'↑' if dir_a == 'up' else '↓'} · "
-                    f"{meta_b.get('short_name')}={wb:.2f}{'↑' if dir_b == 'up' else '↓'}"
+                    f"#{global_index + 1} · seed {seed}"
+                    if not rule_a.get("enabled", True) and not rule_b.get("enabled", True)
+                    and count_b == 1
+                    and count_a > 1
+                    else (
+                        f"{meta_a.get('short_name')}={wa:.2f}{'↑' if dir_a == 'up' else '↓'} · "
+                        f"{meta_b.get('short_name')}={wb:.2f}{'↑' if dir_b == 'up' else '↓'}"
+                    )
                 ),
                 "filename_hint": prefix.split("/")[-1] if "/" in prefix else prefix,
                 "prompt_picks": prompt_picks,

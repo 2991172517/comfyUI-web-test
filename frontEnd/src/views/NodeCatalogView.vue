@@ -1,7 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Download } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { modelImportModalOpen, openModelImportModal } from '@/composables/useModelImportModal.js'
 import PageAlert from '@/components/layout/PageAlert.vue'
 import Card from '@/components/ui/Card.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
@@ -11,15 +14,18 @@ import CardContent from '@/components/ui/CardContent.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import ModelNodeCard from '@/components/models/ModelNodeCard.vue'
+import ModelManifestToolbar from '@/components/models/ModelManifestToolbar.vue'
 import { cn } from '@/lib/utils'
 
 const app = useAppStore()
+const router = useRouter()
 const activeTab = ref('checkpoint')
 const loading = ref(false)
 const search = ref('')
 const checkpoints = ref([])
 const loras = ref([])
 const savingLora = ref(null)
+const deletingName = ref(null)
 const saveTimers = new Map()
 
 const tabs = [
@@ -43,12 +49,17 @@ async function load() {
   loading.value = true
   try {
     const res = await api.listNodeCatalog()
-    checkpoints.value = (res.checkpoints || []).map((c) => ({ name: c.name }))
+    checkpoints.value = (res.checkpoints || []).map((c) => ({
+      name: c.name,
+      recommended_loras: c.recommended_loras || [],
+      not_recommended_loras: c.not_recommended_loras || [],
+    }))
     loras.value = (res.loras || []).map((l) => ({
       name: l.name,
       strength_model: l.strength_model ?? null,
       strength_clip: l.strength_clip ?? null,
     }))
+    await app.loadModelLists().catch(() => {})
   } finally {
     loading.value = false
   }
@@ -92,6 +103,28 @@ async function saveLora(name) {
   }
 }
 
+async function deleteModel(folder, name) {
+  deletingName.value = name
+  try {
+    await api.deleteModel(folder, name, true)
+    if (folder === 'checkpoints') {
+      checkpoints.value = checkpoints.value.filter((c) => c.name !== name)
+    } else {
+      loras.value = loras.value.filter((l) => l.name !== name)
+    }
+    await app.loadModelLists().catch(() => {})
+    app.setMessage(`已删除：${name}`)
+  } catch (e) {
+    app.setMessage(e.message, true)
+  } finally {
+    deletingName.value = null
+  }
+}
+
+watch(modelImportModalOpen, (open, wasOpen) => {
+  if (wasOpen && !open) load().catch(() => {})
+})
+
 onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 </script>
 
@@ -103,12 +136,24 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
       <CardHeader>
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle class="text-base">节点管理</CardTitle>
+            <CardTitle class="text-base">模型管理</CardTitle>
             <CardDescription>
-              直接读取 ComfyUI 本地模型列表；每张卡片展示参考图与 txt 说明。LoRA 默认权重修改后失焦即自动保存。
+              浏览本地 Checkpoint / LoRA；可为每个 Checkpoint 配置推荐/不推荐 LoRA（生成页选 LoRA 时灰字提示，仍可选）。
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" :disabled="loading" @click="load">刷新</Button>
+          <div class="flex flex-wrap items-end gap-3 shrink-0">
+            <ModelManifestToolbar @done="load" />
+            <div class="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" @click="router.push('/models/civitai')">
+                C 站浏览
+              </Button>
+              <Button variant="default" size="sm" class="gap-1.5" @click="openModelImportModal">
+                <Download class="h-4 w-4" />
+                粘贴链接
+              </Button>
+              <Button variant="outline" size="sm" :disabled="loading" @click="load">刷新</Button>
+            </div>
+          </div>
         </div>
       </CardHeader>
 
@@ -155,13 +200,13 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
           v-else-if="activeTab === 'checkpoint' && !filteredCheckpoints.length"
           class="text-sm text-muted-foreground"
         >
-          {{ search ? '无匹配的 Checkpoint' : '本地 checkpoints 目录为空或 ComfyUI 未连接' }}
+          {{ search ? '无匹配的 Checkpoint' : '本地 checkpoints 目录为空' }}
         </p>
         <p
           v-else-if="activeTab === 'lora' && !filteredLoras.length"
           class="text-sm text-muted-foreground"
         >
-          {{ search ? '无匹配的 LoRA' : '本地 loras 目录为空或 ComfyUI 未连接' }}
+          {{ search ? '无匹配的 LoRA' : '本地 loras 目录为空' }}
         </p>
 
         <div
@@ -174,6 +219,23 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
             folder="checkpoints"
             :name="c.name"
             kind="checkpoint"
+            manage
+            :all-loras="loras.map((l) => l.name)"
+            :lora-catalog="app.modelLists.loraCatalog"
+            :recommended-loras="c.recommended_loras"
+            :not-recommended-loras="c.not_recommended_loras"
+            :deleting="deletingName === c.name"
+            @update:recommended-loras="
+              (v) => {
+                c.recommended_loras = v
+              }
+            "
+            @update:not-recommended-loras="
+              (v) => {
+                c.not_recommended_loras = v
+              }
+            "
+            @delete="deleteModel('checkpoints', $event)"
           />
         </div>
 
@@ -187,17 +249,24 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
             folder="loras"
             :name="l.name"
             kind="lora"
+            manage
             :strength-model="l.strength_model"
             :strength-clip="l.strength_clip"
+            :deleting="deletingName === l.name"
             @update:strength-model="updateLoraStrength(l.name, 'strength_model', $event)"
             @update:strength-clip="updateLoraStrength(l.name, 'strength_clip', $event)"
             @strength-blur="scheduleSaveLora(l.name)"
+            @delete="deleteModel('loras', $event)"
           />
         </div>
 
         <p class="text-[11px] text-muted-foreground pt-2 border-t border-border">
-          LoRA 权重在输入框失焦后自动保存；抽卡页选择同名文件时会自动填入。
-          <span v-if="savingLora" class="text-primary ml-1">保存中…</span>
+          删除会移除 .safetensors/.ckpt 及同名资源文件夹（含说明与预览图）。编辑说明会写入
+          <code class="text-[10px] bg-muted px-1 rounded">模型说明.txt</code>。
+          「导出清单」生成
+          <code class="text-[10px] bg-muted px-1 rounded">config/models_manifest.json</code>；
+          「一键下载全部」按清单拉取缺失模型，本地已有则跳过（需 C 站 API Key）。
+          <span v-if="savingLora" class="text-primary ml-1">LoRA 权重保存中…</span>
         </p>
       </CardContent>
     </Card>

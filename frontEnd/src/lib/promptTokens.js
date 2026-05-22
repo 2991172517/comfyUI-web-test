@@ -37,24 +37,36 @@ export function randomGroupMode(group) {
 }
 
 /** @param {{ prompts?: string[] }} group */
+export function groupPickModeLabel(group) {
+  return group?.pick_mode === 'sequential' ? '顺序' : '随机'
+}
+
 export function groupModeDescription(group) {
   const n = countCandidates(group)
   const side = group.target === 'negative' ? '负向' : '正向'
+  const mode = group.pick_mode === 'sequential' ? 'sequential' : 'random'
   if (n <= 1) {
     const line = (group.prompts || []).find((p) => String(p).trim()) || ''
     const k = splitPromptTokens(line).length
-    return `词条池模式：从逗号分隔的 ${k || '…'} 个词条中每次随机选 1 个，追加到${side}提示。`
+    if (mode === 'sequential') {
+      return `词条池 · 顺序：按生成序号从 ${k || '…'} 个词条依次取 1 个（循环），追加到${side}。`
+    }
+    return `词条池 · 随机：从 ${k || '…'} 个词条中按权重抽 1 个，追加到${side}。未设权重默认为 1。`
   }
-  return `多方案模式：共 ${n} 条候选方案，每次随机选 1 条，并将该方案内全部逗号分隔词条一并追加到${side}提示。`
+  if (mode === 'sequential') {
+    return `多方案 · 顺序：共 ${n} 条方案，按生成序号依次选用（循环），方案内全部词条一并追加到${side}。`
+  }
+  return `多方案 · 随机：共 ${n} 条方案，按权重抽 1 条，方案内全部词条追加到${side}。未设权重默认为 1。`
 }
 
 /** @param {{ prompts?: string[] }} group */
 export function groupModeBadge(group) {
   const n = countCandidates(group)
+  const pick = groupPickModeLabel(group)
   if (n <= 1) {
     const line = (group.prompts || []).find((p) => String(p).trim()) || ''
     const k = splitPromptTokens(line).length
-    return `词条池 · ${k} 词`
+    return `${pick} · 池 ${k} 词`
   }
-  return `多方案 · ${n} 条候选`
+  return `${pick} · ${n} 方案`
 }

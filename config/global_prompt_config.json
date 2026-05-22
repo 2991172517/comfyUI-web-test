@@ -1,16 +1,20 @@
 {
   "schema_version": 2,
   "enabled": false,
-  "positive": "big ass",
+  "positive": "",
   "negative": "",
   "random_groups": [
     {
       "id": "global-fd7835b1",
       "name": "丝袜",
-      "enabled": false,
+      "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, thighhighs, lace stockings, fishnet stockings, garter stockings"
+      ],
+      "weights": [
+        1.0
       ]
     },
     {
@@ -18,44 +22,64 @@
       "name": "光影氛围",
       "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "soft lighting, cinematic lighting, rim light, soft backlight, window light, golden hour lighting, volumetric lighting, soft glow, dreamy atmosphere, romantic atmosphere"
+      ],
+      "weights": [
+        1.0
       ]
     },
     {
       "id": "global-b056eb1c",
       "name": "质感",
-      "enabled": false,
+      "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "soft smooth skin, matte skin, silky skin, detailed stocking texture, soft fabric texture, delicate lace texture, clean thick lineart, sharp outlines, smooth rendering, fine hair strands"
+      ],
+      "weights": [
+        1.0
       ]
     },
     {
       "id": "global-51449afa",
       "name": "视角",
-      "enabled": false,
+      "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "front view,side view,back view,three‑quarter view,oblique view,from below,from above,slightly low angle,slightly high angle,straight‑on view"
+      ],
+      "weights": [
+        1.0
       ]
     },
     {
       "id": "global-23bfcfe1",
       "name": "表情情绪",
-      "enabled": false,
+      "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "soft smile, shy smile, light blush, embarrassed expression, bashful expression, excited expression, happy smile, teasing smile, seductive smile, flushed face"
+      ],
+      "weights": [
+        1.0
       ]
     },
     {
       "id": "global-g_mpebvi6z_6de1",
       "name": "构图",
-      "enabled": false,
+      "enabled": true,
       "target": "positive",
+      "pick_mode": "random",
       "prompts": [
         "full body shot,full body view,full body portrait,full body framing,full body composition,standing full body,full body from head to toe,full body with legs visible,full body centered,full body on simple background"
+      ],
+      "weights": [
+        1.0
       ]
     }
   ],

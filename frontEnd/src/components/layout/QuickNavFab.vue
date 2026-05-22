@@ -1,19 +1,21 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { openGlobalPromptModal } from '@/composables/useGlobalPromptModal.js'
+import { openModelImportModal } from '@/composables/useModelImportModal.js'
 import { onClickOutside } from '@vueuse/core'
 import {
   Menu,
   X,
   FileText,
   Download,
+  Globe,
   FolderOpen,
   ChevronRight,
   Copy,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import { api } from '@/api/client.js'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { cn } from '@/lib/utils'
 
@@ -22,8 +24,8 @@ const subOpen = ref(false)
 const folderPaths = ref({ checkpoints: '', loras: '' })
 const opening = ref(null)
 const rootRef = ref(null)
-const router = useRouter()
 const app = useAppStore()
+const router = useRouter()
 const toast = ref('')
 let toastTimer = null
 
@@ -49,11 +51,6 @@ function toggle() {
 function close() {
   open.value = false
   subOpen.value = false
-}
-
-function navTo(path) {
-  close()
-  router.push(path)
 }
 
 async function ensurePaths() {
@@ -140,9 +137,29 @@ const menuItemClass =
           <FileText class="h-4 w-4 shrink-0 text-primary" />
           提示词设置
         </button>
-        <button type="button" :class="menuItemClass" role="menuitem" @click="navTo('/models/import')">
+        <button
+          type="button"
+          :class="menuItemClass"
+          role="menuitem"
+          @click="
+            router.push('/models/civitai');
+            close();
+          "
+        >
+          <Globe class="h-4 w-4 shrink-0 text-primary" />
+          C 站模型库
+        </button>
+        <button
+          type="button"
+          :class="menuItemClass"
+          role="menuitem"
+          @click="
+            openModelImportModal();
+            close();
+          "
+        >
           <Download class="h-4 w-4 shrink-0 text-primary" />
-          模型下载
+          粘贴链接导入
         </button>
 
         <div class="my-1 border-t border-border" />

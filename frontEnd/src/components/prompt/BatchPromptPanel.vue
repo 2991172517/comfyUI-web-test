@@ -45,7 +45,7 @@ function onImport(cfg) {
             >
               全局默认
             </button>
-            → 本页固定 → 各随机组（每图抽 1 条）
+            → 本页固定 → 各随机组（随机加权 / 按图序号顺序轮询）
           </CardDescription>
         </div>
         <div class="flex items-center gap-2">

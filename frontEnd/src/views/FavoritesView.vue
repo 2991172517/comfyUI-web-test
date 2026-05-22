@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createFavoritesPageStore } from '@/stores/useFavoritesPageStore.js'
+import { useFavoritesPageStore } from '@/stores/useFavoritesPageStore.js'
 import PageAlert from '@/components/layout/PageAlert.vue'
 import FavoritesFilters from '@/components/favorites/FavoritesFilters.vue'
 import FavoritesFeed from '@/components/favorites/FavoritesFeed.vue'
@@ -10,7 +10,7 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 
 const route = useRoute()
 const router = useRouter()
-const fav = createFavoritesPageStore()
+const fav = useFavoritesPageStore()
 const feedLightbox = ref(null)
 
 const inDetail = computed(() => !!fav.selected)

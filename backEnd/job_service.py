@@ -75,6 +75,19 @@ def safe_delete_image_file(filename: str, subfolder: str = "", folder_type: str 
     return False
 
 
+def cancel_job(prompt_id: str) -> dict:
+    """中断 ComfyUI 当前执行，并标记单图任务为已取消。"""
+    pid = str(prompt_id or "").strip()
+    if not pid:
+        raise ValueError("缺少 prompt_id")
+    try:
+        comfy_client.interrupt()
+    except RuntimeError:
+        pass
+    ws_tracker.mark_cancelled(pid)
+    return {"ok": True, "prompt_id": pid, "status": "cancelled"}
+
+
 def get_job_detail(prompt_id: str) -> dict:
     tracked = ws_tracker.get_tracker_state(prompt_id)
 
@@ -94,6 +107,19 @@ def _build_job_response(prompt_id: str, tracked: dict, job: dict | None) -> dict
     status = job.get("status", "unknown") if job else tracked.get("status", "unknown")
     images = []
     message = ""
+
+    if tracked.get("status") == "cancelled":
+        return {
+            "id": prompt_id,
+            "status": "cancelled",
+            "images": [],
+            "message": "任务已取消",
+            "current_node": None,
+            "progress": None,
+            "preview_output": (job or {}).get("preview_output"),
+            "outputs_count": (job or {}).get("outputs_count", 0),
+            "execution_error": (job or {}).get("execution_error"),
+        }
 
     if tracked.get("error") and status not in ("completed",):
         status = "failed"

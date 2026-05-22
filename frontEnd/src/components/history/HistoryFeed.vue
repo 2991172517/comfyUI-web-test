@@ -2,16 +2,19 @@
 import { ref } from 'vue'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { isAdmin } from '@/composables/useAuth.js'
 import { statusLabel } from '@/api/client.js'
 import Badge from '@/components/ui/Badge.vue'
 import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
 import { cn } from '@/lib/utils'
 import { Grid3x3, ImageIcon } from 'lucide-vue-next'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const history = useHistoryStore()
 const app = useAppStore()
 const deleting = ref(false)
 const emit = defineEmits(['preview-single'])
+const { saveOne, resolveDownloadFilename } = useImageDownload()
 
 async function deleteRecord(ev, rec) {
   ev.stopPropagation()
@@ -58,6 +61,16 @@ function select(rec) {
 function previewSingle(ev, rec) {
   ev.stopPropagation()
   emit('preview-single', rec)
+}
+
+function saveSingleThumb(ev, rec) {
+  ev.stopPropagation()
+  if (!rec.thumbnail_url) return
+  const id = rec.prompt_id || rec.id || 'single'
+  saveOne({
+    url: rec.thumbnail_url,
+    filename: resolveDownloadFilename(rec.thumbnail_url, `${id}.png`),
+  })
 }
 </script>
 
@@ -113,20 +126,32 @@ function previewSingle(ev, rec) {
           </Badge>
         </div>
         <IconDeleteButton
+          v-if="isAdmin()"
           size="sm"
-          class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="absolute right-2 top-2 z-20 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
           :disabled="deleting"
           :title="rec.type === 'batch' ? '删除整批' : '删除'"
           @click="deleteRecord($event, rec)"
         />
-        <button
+        <div
           v-if="rec.type === 'single' && rec.thumbnail_url"
-          type="button"
-          class="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100"
-          @click="previewSingle($event, rec)"
+          class="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/0 opacity-0 pointer-events-none transition group-hover:bg-black/30 group-hover:opacity-100 group-hover:pointer-events-auto"
         >
-          <span class="rounded-md bg-background/90 px-2 py-1 text-xs font-medium">放大</span>
-        </button>
+          <button
+            type="button"
+            class="rounded-md bg-background/90 px-2 py-1 text-xs font-medium"
+            @click="previewSingle($event, rec)"
+          >
+            放大
+          </button>
+          <button
+            type="button"
+            class="rounded-md bg-background/90 px-2 py-1 text-xs font-medium"
+            @click="saveSingleThumb($event, rec)"
+          >
+            保存
+          </button>
+        </div>
       </div>
       <div class="space-y-1 p-3">
         <p class="truncate font-mono text-[10px] text-muted-foreground">

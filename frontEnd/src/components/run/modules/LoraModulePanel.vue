@@ -1,11 +1,15 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
+import { useCheckpointLoraCompat } from '@/composables/useCheckpointLoraCompat.js'
 import Label from '@/components/ui/Label.vue'
 import Input from '@/components/ui/Input.vue'
 import SelectNative from '@/components/ui/SelectNative.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Switch from '@/components/ui/Switch.vue'
+import Slider from '@/components/ui/Slider.vue'
+import LoraStrengthControl from '@/components/models/LoraStrengthControl.vue'
 import LoraModelPicker from '@/components/models/LoraModelPicker.vue'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +20,10 @@ const props = defineProps({
 
 const app = useAppStore()
 const batch = useBatchStore()
+const singleSyncPair = ref(true)
+
+const activeCheckpoint = computed(() => app.activeCheckpointName)
+const loraCompat = useCheckpointLoraCompat(activeCheckpoint)
 
 watch(
   () => [app.selectedId, app.workflowLoras],
@@ -35,6 +43,39 @@ function loraFileName(l) {
   }
   return String(app.fieldValue(l.node_id, { key: 'lora_name', value: l.lora_name }))
 }
+
+function axisState(nodeId) {
+  return batch.loraAxisState[nodeId]
+}
+
+function patchFixed(nodeId, key, val) {
+  const st = axisState(nodeId)
+  if (!st) return
+  st[key] = val
+  if (key === 'fixedModel' && st.syncPair) st.fixedClip = val
+  if (key === 'fixedClip' && st.syncPair) st.fixedModel = val
+  app.updateField(nodeId, key === 'fixedModel' ? 'strength_model' : 'strength_clip', val)
+  if (st.syncPair) {
+    app.updateField(nodeId, 'strength_model', st.fixedModel)
+    app.updateField(nodeId, 'strength_clip', st.fixedClip)
+  }
+}
+
+function patchSingle(nodeId, key, val) {
+  app.updateField(nodeId, key, val)
+  if (singleSyncPair.value && (key === 'strength_model' || key === 'strength_clip')) {
+    const other = key === 'strength_model' ? 'strength_clip' : 'strength_model'
+    app.updateField(nodeId, other, val)
+  }
+}
+
+function singleModel(nodeId, l) {
+  return app.fieldValue(nodeId, { key: 'strength_model', value: l.strength_model })
+}
+
+function singleClip(nodeId, l) {
+  return app.fieldValue(nodeId, { key: 'strength_clip', value: l.strength_clip })
+}
 </script>
 
 <template>
@@ -42,9 +83,27 @@ function loraFileName(l) {
     当前工作流没有 LoRA 节点。
   </div>
   <div v-else class="space-y-4">
+    <p
+      v-if="activeCheckpoint"
+      class="text-[11px] text-muted-foreground rounded-md border border-border/70 bg-muted/15 px-3 py-2"
+    >
+      当前 Checkpoint：
+      <span class="font-mono text-foreground">{{ activeCheckpoint }}</span>
+      <span v-if="loraCompat.loading"> · 加载适配…</span>
+      <span v-else> · LoRA 列表按推荐/不推荐标记（灰字仍可点选）</span>
+    </p>
+    <p v-else class="text-[11px] text-amber-600 dark:text-amber-400 px-1">
+      请先在「其他」模块中选择 Checkpoint，再配置 LoRA 时将显示适配提示。
+    </p>
     <p v-if="batchMode" class="text-sm text-muted-foreground">
-      勾选最多 2 个参与 A×B 扫参；当前计划
-      <strong class="text-foreground">{{ batch.plannedTotal }}</strong> 张
+      <template v-if="batch.hasSweepEnabled">
+        最多 2 个 LoRA 参与 A×B 扫参；当前计划
+        <strong class="text-foreground">{{ batch.plannedTotal }}</strong> 张
+      </template>
+      <template v-else>
+        未开启扫参，将按固定权重连续生成
+        <strong class="text-foreground">{{ batch.plannedTotal }}</strong> 张（最多 12）
+      </template>
     </p>
 
     <article
@@ -73,24 +132,25 @@ function loraFileName(l) {
             扫参 {{ batch.loraAxisState[l.node_id]?.sweepRole || '?' }}
           </Badge>
         </div>
-        <label v-if="batchMode" class="flex items-center gap-2 text-sm shrink-0">
-          <input
-            type="checkbox"
-            class="rounded border-input h-4 w-4"
-            :checked="batch.loraAxisState[l.node_id]?.enabled"
+        <div v-if="batchMode" class="flex items-center gap-2 shrink-0">
+          <Label class="text-sm text-muted-foreground mb-0">参与扫参</Label>
+          <Switch
+            :model-value="!!batch.loraAxisState[l.node_id]?.enabled"
+            size="sm"
             :disabled="disabled"
-            @change="batch.toggleLoraSweep(l.node_id, $event.target.checked)"
+            :aria-label="`LoRA ${l.node_id} 参与扫参`"
+            @update:model-value="batch.toggleLoraSweep(l.node_id, $event)"
           />
-          参与扫参
-        </label>
+        </div>
       </div>
 
       <LoraModelPicker
-        :key="`lora-picker-${l.node_id}-${app.restoreEpoch}`"
+        :key="`lora-picker-${l.node_id}-${app.restoreEpoch}-${activeCheckpoint}`"
         label="LoRA 模型"
         :model-value="loraFileName(l)"
         :options="app.modelLists.loras"
         :catalog="app.modelLists.loraCatalog"
+        :lora-compat-map="loraCompat.compatMap"
         :missing-value="
           !batchMode &&
           app.modelSelectMissing(l.node_id, { key: 'lora_name', value: l.lora_name })
@@ -111,14 +171,26 @@ function loraFileName(l) {
       />
 
       <template v-if="batchMode && batch.loraAxisState[l.node_id]?.enabled">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div class="space-y-1.5">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="space-y-1.5 sm:col-span-2 lg:col-span-1">
             <Label>起始权重</Label>
-            <Input v-model.number="batch.loraAxisState[l.node_id].start" type="number" step="0.05" />
+            <Slider
+              v-model="batch.loraAxisState[l.node_id].start"
+              :min="0"
+              :max="2"
+              :step="0.05"
+              :disabled="disabled"
+            />
           </div>
           <div class="space-y-1.5">
             <Label>步进</Label>
-            <Input v-model.number="batch.loraAxisState[l.node_id].step" type="number" step="0.05" min="0.01" />
+            <Slider
+              v-model="batch.loraAxisState[l.node_id].step"
+              :min="0.01"
+              :max="0.5"
+              :step="0.01"
+              :disabled="disabled"
+            />
           </div>
           <div class="space-y-1.5">
             <Label>方向</Label>
@@ -129,33 +201,39 @@ function loraFileName(l) {
           </div>
           <div class="space-y-1.5">
             <Label>档位数</Label>
-            <Input v-model.number="batch.loraAxisState[l.node_id].count" type="number" min="1" max="20" />
+            <Input
+              v-model.number="batch.loraAxisState[l.node_id].count"
+              type="number"
+              min="1"
+              max="20"
+              :disabled="disabled"
+            />
           </div>
         </div>
       </template>
+
+      <template v-else-if="batchMode">
+        <LoraStrengthControl
+          :model="batch.loraAxisState[l.node_id].fixedModel"
+          :clip="batch.loraAxisState[l.node_id].fixedClip"
+          :sync="batch.loraAxisState[l.node_id].syncPair"
+          :disabled="disabled"
+          @update:sync="batch.loraAxisState[l.node_id].syncPair = $event"
+          @update:model="patchFixed(l.node_id, 'fixedModel', $event)"
+          @update:clip="patchFixed(l.node_id, 'fixedClip', $event)"
+        />
+      </template>
+
       <template v-else>
-        <div class="grid gap-4 sm:grid-cols-2 max-w-xl">
-          <div class="space-y-1.5">
-            <Label>strength_model</Label>
-            <Input
-              type="number"
-              step="0.05"
-              :model-value="app.fieldValue(l.node_id, { key: 'strength_model', value: l.strength_model })"
-              :disabled="disabled"
-              @update:model-value="app.updateField(l.node_id, 'strength_model', Number($event))"
-            />
-          </div>
-          <div class="space-y-1.5">
-            <Label>strength_clip</Label>
-            <Input
-              type="number"
-              step="0.05"
-              :model-value="app.fieldValue(l.node_id, { key: 'strength_clip', value: l.strength_clip })"
-              :disabled="disabled"
-              @update:model-value="app.updateField(l.node_id, 'strength_clip', Number($event))"
-            />
-          </div>
-        </div>
+        <LoraStrengthControl
+          :model="singleModel(l.node_id, l)"
+          :clip="singleClip(l.node_id, l)"
+          :sync="singleSyncPair"
+          :disabled="disabled"
+          @update:sync="singleSyncPair = $event"
+          @update:model="patchSingle(l.node_id, 'strength_model', $event)"
+          @update:clip="patchSingle(l.node_id, 'strength_clip', $event)"
+        />
       </template>
     </article>
   </div>

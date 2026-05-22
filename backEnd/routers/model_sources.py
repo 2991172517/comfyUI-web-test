@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from model_parser.site_router import SiteRouter
@@ -13,6 +13,11 @@ log = logging.getLogger("custom_project.api.model_sources")
 
 router = APIRouter(prefix="/api/model-sources", tags=["model-sources"])
 _site_router = SiteRouter()
+
+
+class CivitaiFavoriteBody(BaseModel):
+    civitai_api_token: str = Field(default="", description="浏览器 localStorage 中的 Civitai API Key")
+    item: dict = Field(description="browse 卡片字段快照")
 
 
 class ImportModelBody(BaseModel):
@@ -29,6 +34,117 @@ class ImportModelBody(BaseModel):
     version_id: str | int | None = None
     source_url: str = ""
     civitai_api_token: str = Field(default="", description="前端 localStorage 中的 Civitai API Key")
+
+
+@router.get("/civitai/browse/presets")
+def civitai_browse_presets():
+    from model_parser.civitai.browse_service import list_presets
+
+    return {"ok": True, "presets": list_presets()}
+
+
+@router.get("/civitai/tags")
+def civitai_search_tags(
+    query: str | None = Query(None, description="标签名关键词"),
+    page: int = Query(1, ge=1, le=100),
+    limit: int = Query(30, ge=1, le=200),
+):
+    from model_parser.civitai.browse_service import search_tags
+
+    try:
+        data = search_tags(query=query, page=page, limit=limit)
+        return {"ok": True, **data}
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.get("/civitai/browse")
+def civitai_browse_models(
+    types: str | None = Query(None, description="Checkpoint,LORA 等，逗号分隔"),
+    sort: str = Query("Most Downloaded"),
+    period: str = Query("Month"),
+    query: str | None = Query(None, description="全文搜索（需 cursor 翻页）"),
+    tag: str | None = Query(None, description="按标签筛选，如 anime、character"),
+    cursor: str | None = Query(None, description="上一页返回的 nextCursor"),
+    page: int = Query(1, ge=1, le=500, description="仅用于前端展示页码"),
+    limit: int = Query(24, ge=1, le=100),
+    base_models: str | None = Query(None, alias="baseModels"),
+    content: str = Query(
+        "sfw",
+        description="内容范围：sfw=蓝站(SFW)、nsfw=红站(NSFW)、all=不筛选",
+    ),
+    nsfw: bool | None = Query(None, description="已废弃，请用 content=nsfw"),
+):
+    from model_parser.civitai.browse_service import browse_models
+
+    try:
+        data = browse_models(
+            types=types,
+            sort=sort,
+            period=period,
+            query=query,
+            tag=tag,
+            cursor=cursor,
+            page=page,
+            limit=limit,
+            base_models=base_models,
+            content=content,
+            nsfw=nsfw,
+        )
+        return {"ok": True, **data}
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+def _civitai_token_from(
+    header: str | None,
+    query: str | None,
+    body_token: str | None = None,
+) -> str:
+    for raw in (header, query, body_token):
+        t = (raw or "").strip()
+        if t:
+            return t
+    return ""
+
+
+@router.get("/civitai/favorites")
+def civitai_list_favorites(
+    civitai_api_token: str = Query("", alias="civitaiApiToken"),
+    x_civitai_api_key: str | None = Header(None, alias="X-Civitai-Api-Key"),
+):
+    import civitai_favorites_service as fav_svc
+
+    token = _civitai_token_from(x_civitai_api_key, civitai_api_token)
+    data = fav_svc.list_favorites(token)
+    return {"ok": True, **data}
+
+
+@router.post("/civitai/favorites")
+def civitai_add_favorite(body: CivitaiFavoriteBody):
+    import civitai_favorites_service as fav_svc
+
+    try:
+        data = fav_svc.add_favorite(body.civitai_api_token, body.item)
+        return {"ok": True, **data}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/civitai/favorites/{model_id}")
+def civitai_remove_favorite(
+    model_id: str,
+    civitai_api_token: str = Query("", alias="civitaiApiToken"),
+    x_civitai_api_key: str | None = Header(None, alias="X-Civitai-Api-Key"),
+):
+    import civitai_favorites_service as fav_svc
+
+    token = _civitai_token_from(x_civitai_api_key, civitai_api_token)
+    try:
+        data = fav_svc.remove_favorite(token, model_id)
+        return {"ok": True, **data}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/settings")

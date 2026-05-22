@@ -11,6 +11,8 @@ import Badge from '@/components/ui/Badge.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
 import { buildSingleFavoritePayload } from '@/utils/favoritePayload.js'
 import { ArrowLeft } from 'lucide-vue-next'
+import { isAdmin } from '@/composables/useAuth.js'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const emit = defineEmits(['back', 'preview', 'deleted'])
 
@@ -18,6 +20,7 @@ const history = useHistoryStore()
 const app = useAppStore()
 const router = useRouter()
 const deleting = ref(false)
+const { saveOne } = useImageDownload()
 
 const entry = computed(() => history.singleDetail)
 const img = computed(() => entry.value?.images?.[0])
@@ -91,9 +94,18 @@ async function removeRecord() {
           <p class="font-mono text-xs text-muted-foreground">{{ entry.prompt_id }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button
+            v-if="img?.url"
+            variant="outline"
+            size="sm"
+            @click="saveOne(img)"
+          >
+            保存
+          </Button>
           <Button variant="outline" size="sm" @click="detailOpen = true">详情</Button>
           <Button size="sm" @click="regenerate">以此生成</Button>
           <Button
+            v-if="isAdmin()"
             variant="destructive"
             size="sm"
             :disabled="deleting"

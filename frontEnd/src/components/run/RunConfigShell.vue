@@ -7,14 +7,13 @@ import ModuleTabBar from '@/components/run/ModuleTabBar.vue'
 
 defineProps({
   loading: { type: Boolean, default: false },
-  wide: { type: Boolean, default: false },
 })
 
 const activeModule = ref('prompt')
 </script>
 
 <template>
-  <div :class="['space-y-4 mx-auto w-full', wide ? 'max-w-7xl' : 'max-w-6xl']">
+  <div class="space-y-4 w-full">
     <PageAlert />
     <WorkflowRunHeader />
     <GlobalPromptBar />

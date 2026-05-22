@@ -105,6 +105,101 @@ def merge_deduped_core_with_random(
     return join_prompt_tokens(final_tokens), removed, placement
 
 
+PICK_MODES = frozenset({"random", "sequential"})
+
+
+def _normalize_weight(value: Any, default: float = 1.0) -> float:
+    try:
+        w = float(value)
+    except (TypeError, ValueError):
+        w = default
+    return max(0.0, w)
+
+
+def _weights_for_pool(group: dict, pool_len: int) -> list[float]:
+    raw = group.get("weights") or []
+    weights = [_normalize_weight(raw[i] if i < len(raw) else 1.0) for i in range(pool_len)]
+    if not any(w > 0 for w in weights):
+        return [1.0] * pool_len
+    return weights
+
+
+def _weights_for_tokens(group: dict, token_count: int) -> list[float]:
+    raw = group.get("weights") or []
+    if len(raw) == token_count:
+        weights = [_normalize_weight(x) for x in raw]
+    else:
+        weights = [1.0] * token_count
+    if not any(w > 0 for w in weights):
+        return [1.0] * token_count
+    return weights
+
+
+def _weighted_index(weights: list[float], rng: random.Random) -> int:
+    total = sum(weights)
+    if total <= 0:
+        return rng.randrange(len(weights))
+    r = rng.random() * total
+    acc = 0.0
+    for i, w in enumerate(weights):
+        acc += w
+        if r <= acc:
+            return i
+    return len(weights) - 1
+
+
+def resolve_sequential_group_pick(
+    group: dict,
+    index: int,
+) -> tuple[str, list[str], dict[str, Any]]:
+    """按批量序号顺序取词：index 对候选数/词条数取模，超出后从头循环。"""
+    pool = [str(p).strip() for p in (group.get("prompts") or []) if str(p).strip()]
+    if not pool:
+        return "", [], {}
+
+    target = group.get("target", "positive")
+    seq_index = int(index or 0)
+    base_rec: dict[str, Any] = {
+        "group_id": group.get("id"),
+        "group_name": group.get("name"),
+        "target": target,
+        "pick_mode": "sequential",
+        "sequence_index": seq_index,
+    }
+
+    if len(pool) == 1:
+        tokens = split_prompt_tokens(pool[0])
+        if not tokens:
+            return "", [], base_rec
+        idx = seq_index % len(tokens)
+        chosen = tokens[idx]
+        record = {
+            **base_rec,
+            "mode": "sequential_one_of_tokens",
+            "candidate_count": 1,
+            "token_index": idx,
+            "token_count": len(tokens),
+            "tokens": [chosen],
+            "text": chosen,
+        }
+        return chosen, [chosen], record
+
+    idx = seq_index % len(pool)
+    line = pool[idx]
+    tokens = split_prompt_tokens(line)
+    merged = join_prompt_tokens(tokens)
+    record = {
+        **base_rec,
+        "mode": "sequential_all_tokens_from_candidate",
+        "candidate_count": len(pool),
+        "candidate_index": idx,
+        "candidate_preview": line[:120] + ("…" if len(line) > 120 else ""),
+        "tokens": tokens,
+        "text": merged,
+    }
+    return merged, tokens, record
+
+
 def resolve_random_group_pick(
     group: dict,
     rng: random.Random,
@@ -126,24 +221,31 @@ def resolve_random_group_pick(
         "group_id": group.get("id"),
         "group_name": group.get("name"),
         "target": target,
+        "pick_mode": "random",
     }
 
     if len(pool) == 1:
         tokens = split_prompt_tokens(pool[0])
         if not tokens:
             return "", [], base_rec
-        chosen = rng.choice(tokens)
+        weights = _weights_for_tokens(group, len(tokens))
+        idx = _weighted_index(weights, rng)
+        chosen = tokens[idx]
         merged = chosen
         record = {
             **base_rec,
             "mode": "one_of_tokens",
             "candidate_count": 1,
+            "token_index": idx,
+            "token_count": len(tokens),
+            "token_weight": weights[idx],
             "tokens": [chosen],
             "text": merged,
         }
         return merged, [chosen], record
 
-    idx = rng.randrange(len(pool))
+    weights = _weights_for_pool(group, len(pool))
+    idx = _weighted_index(weights, rng)
     line = pool[idx]
     tokens = split_prompt_tokens(line)
     merged = join_prompt_tokens(tokens)
@@ -152,11 +254,26 @@ def resolve_random_group_pick(
         "mode": "all_tokens_from_candidate",
         "candidate_count": len(pool),
         "candidate_index": idx,
+        "candidate_weight": weights[idx],
         "candidate_preview": line[:120] + ("…" if len(line) > 120 else ""),
         "tokens": tokens,
         "text": merged,
     }
     return merged, tokens, record
+
+
+def resolve_group_pick(
+    group: dict,
+    *,
+    rng: random.Random,
+    index: int = 0,
+) -> tuple[str, list[str], dict[str, Any]]:
+    mode = str(group.get("pick_mode") or "random").strip().lower()
+    if mode not in PICK_MODES:
+        mode = "random"
+    if mode == "sequential":
+        return resolve_sequential_group_pick(group, index)
+    return resolve_random_group_pick(group, rng)
 
 
 def pick_random_groups(
@@ -176,7 +293,7 @@ def pick_random_groups(
     for g in groups:
         if not g.get("enabled", True):
             continue
-        merged, _tokens, rec = resolve_random_group_pick(g, rng)
+        merged, _tokens, rec = resolve_group_pick(g, rng=rng, index=index)
         if not merged:
             continue
         target = rec.get("target", "positive")

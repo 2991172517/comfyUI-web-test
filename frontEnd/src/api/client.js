@@ -1,9 +1,37 @@
+import { clearAccessToken, getAccessToken, setAuthSession } from '@/composables/useAuth.js'
+import { loadCivitaiApiKey } from '@/composables/useCivitaiApiKey.js'
+
+/** Civitai Key 走 query/body，避免自定义头干扰 X-Access-Token 解析 */
+function civitaiKeyQuery() {
+  const key = loadCivitaiApiKey()
+  return key ? `civitaiApiToken=${encodeURIComponent(key)}` : ''
+}
+
+function authHeaders() {
+  const token = getAccessToken()
+  return token ? { 'X-Access-Token': token } : {}
+}
+
 async function request(path, options = {}) {
+  const { skipAuthRedirect, ...fetchOptions } = options
+  const isPublicAuth =
+    path === '/api/auth/login' || path === '/api/auth/admin/login'
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(isPublicAuth ? {} : authHeaders()),
+      ...fetchOptions.headers,
+    },
+    ...fetchOptions,
   })
   const data = await res.json().catch(() => ({}))
+  if (res.status === 401 && !isPublicAuth && !skipAuthRedirect) {
+    clearAccessToken()
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+      window.location.assign(`/login?redirect=${redirect}`)
+    }
+  }
   if (!res.ok) {
     const detail = data.detail
     if (typeof detail === 'string') {
@@ -30,6 +58,29 @@ function wfPath(id) {
 }
 
 export const api = {
+  authLogin: (code) =>
+    request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  authLogout: () =>
+    request('/api/auth/logout', { method: 'POST' }).finally(() => clearAccessToken()),
+  authAdminLogin: (username, password) =>
+    request('/api/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+  authMe: () => request('/api/auth/me'),
+  listInvites: () => request('/api/admin/invites'),
+  createInvite: (body) =>
+    request('/api/admin/invites', { method: 'POST', body: JSON.stringify(body) }),
+  updateInvite: (id, body) =>
+    request(`/api/admin/invites/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteInvite: (id) =>
+    request(`/api/admin/invites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   health: () => request('/api/health'),
   listWorkflows: () => request('/api/workflows'),
   getWorkflowTemplate: () => request('/api/workflow-template'),
@@ -103,6 +154,8 @@ export const api = {
       }),
     }),
   getJob: (promptId) => request(`/api/jobs/${promptId}`),
+  cancelJob: (promptId) =>
+    request(`/api/jobs/${encodeURIComponent(promptId)}/cancel`, { method: 'POST' }),
   deleteJobOutputs: (promptId, images = null) =>
     request(`/api/jobs/${promptId}/outputs`, {
       method: 'DELETE',
@@ -149,6 +202,15 @@ export const api = {
     }),
   getLoraModelDefaults: (name) =>
     request(`/api/node-catalog/lora-defaults?name=${encodeURIComponent(name)}`),
+  getCheckpointLoraCompat: (checkpoint) =>
+    request(
+      `/api/node-catalog/lora-compat?checkpoint=${encodeURIComponent(checkpoint)}`,
+    ),
+  saveCheckpointLoraCompat: (body) =>
+    request('/api/node-catalog/lora-compat', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   getWorkflowNodeCatalog: (workflowId) =>
     request(`/api/workflows/${wfPath(workflowId)}/node-catalog`),
   saveWorkflowNodeCatalog: (workflowId, body) =>
@@ -215,7 +277,64 @@ export const api = {
     request(`/api/models/${folder}${withPreviews ? '?with_previews=1' : ''}`),
   getModelPreviews: (folder, name) =>
     request(`/api/models/${folder}/previews?name=${encodeURIComponent(name)}`),
+  saveModelDescription: (folder, body) =>
+    request(`/api/models/${folder}/description`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteModel: (folder, name, deleteAssets = true) =>
+    request(
+      `/api/models/${folder}/item?name=${encodeURIComponent(name)}&delete_assets=${deleteAssets ? '1' : '0'}`,
+      { method: 'DELETE' },
+    ),
   getModelSourceSettings: () => request('/api/model-sources/settings'),
+  getCivitaiBrowsePresets: () => request('/api/model-sources/civitai/browse/presets'),
+  browseCivitaiModels: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.types) q.set('types', params.types)
+    if (params.sort) q.set('sort', params.sort)
+    if (params.period) q.set('period', params.period)
+    if (params.query) q.set('query', params.query)
+    if (params.tag) q.set('tag', params.tag)
+    if (params.cursor) q.set('cursor', params.cursor)
+    if (params.page != null) q.set('page', String(params.page))
+    if (params.limit != null) q.set('limit', String(params.limit))
+    if (params.baseModels) q.set('baseModels', params.baseModels)
+    if (params.content) q.set('content', params.content)
+    else if (params.nsfw) q.set('content', 'nsfw')
+    return request(`/api/model-sources/civitai/browse?${q}`)
+  },
+  listCivitaiModelFavorites: () => {
+    const q = civitaiKeyQuery()
+    const suffix = q ? `?${q}` : ''
+    return request(`/api/model-sources/civitai/favorites${suffix}`, {
+      skipAuthRedirect: true,
+    })
+  },
+  addCivitaiModelFavorite: (item) =>
+    request('/api/model-sources/civitai/favorites', {
+      method: 'POST',
+      body: JSON.stringify({
+        civitai_api_token: loadCivitaiApiKey(),
+        item,
+      }),
+      skipAuthRedirect: true,
+    }),
+  removeCivitaiModelFavorite: (modelId) => {
+    const q = civitaiKeyQuery()
+    const suffix = q ? `?${q}` : ''
+    return request(
+      `/api/model-sources/civitai/favorites/${encodeURIComponent(modelId)}${suffix}`,
+      { method: 'DELETE', skipAuthRedirect: true },
+    )
+  },
+  searchCivitaiTags: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.query) q.set('query', params.query)
+    if (params.page != null) q.set('page', String(params.page))
+    if (params.limit != null) q.set('limit', String(params.limit))
+    return request(`/api/model-sources/civitai/tags?${q}`)
+  },
   parseModelSourceUrl: (url) =>
     request(`/api/model-sources/parse?url=${encodeURIComponent(url)}`),
   getModelSourceVersion: (site, versionId, modelId) => {
@@ -254,6 +373,38 @@ export const api = {
       }
     }
     throw new Error('导入超时')
+  },
+  exportModelsManifest: (save = true, includeCatalog = true) =>
+    request(
+      `/api/model-manifest/export?save=${save ? '1' : '0'}&include_catalog=${includeCatalog ? '1' : '0'}`,
+      { method: 'POST' },
+    ),
+  downloadModelsManifestUrl: () => '/api/model-manifest/export/file',
+  startManifestImportAll: (body) =>
+    request('/api/model-manifest/import-all', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  getManifestImportJob: (jobId) =>
+    request(`/api/model-manifest/import/${encodeURIComponent(jobId)}`),
+  async importManifestAllWithProgress(body, onProgress) {
+    const { jobId } = await this.startManifestImportAll(body)
+    if (onProgress) {
+      const initial = await this.getManifestImportJob(jobId)
+      onProgress(initial)
+    }
+    for (let i = 0; i < 7200; i++) {
+      await sleep(500)
+      const job = await this.getManifestImportJob(jobId)
+      if (onProgress) onProgress(job)
+      if (job.status === 'completed' || job.status === 'completed_with_errors') {
+        return job.batchSummary || job.result || job
+      }
+      if (job.status === 'failed') {
+        throw new Error(job.message || job.error || '批量下载失败')
+      }
+    }
+    throw new Error('批量下载超时')
   },
   listFavorites: () => request('/api/favorites'),
   addFavorite: (body) =>

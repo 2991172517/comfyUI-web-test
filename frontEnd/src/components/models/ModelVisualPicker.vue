@@ -35,6 +35,8 @@ const props = defineProps({
   missingValue: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  /** loras 目录：loraName -> recommended | not_recommended | neutral */
+  loraCompatMap: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -79,7 +81,10 @@ const filteredOptions = computed(() => {
   })
 })
 
-const { summary } = useModelAssets(toRef(props, 'folder'), toRef(props, 'modelValue'))
+const { summary, loading: summaryLoading } = useModelAssets(
+  toRef(props, 'folder'),
+  toRef(props, 'modelValue'),
+)
 
 const selectedTitle = computed(() => modelDisplayTitle(props.modelValue))
 
@@ -96,6 +101,18 @@ const summaryDisplay = computed(() => {
   const split = splitSourceUrl(summary.value.content || '')
   return { ...split, truncated: summary.value.truncated }
 })
+
+function loraCompatStatus(name) {
+  if (props.folder !== 'loras' || !props.loraCompatMap) return 'neutral'
+  return props.loraCompatMap[name] || 'neutral'
+}
+
+function loraCompatHint(name) {
+  const s = loraCompatStatus(name)
+  if (s === 'not_recommended') return '不推荐用于当前 Checkpoint，仍可选择'
+  if (s === 'recommended') return '推荐用于当前 Checkpoint'
+  return ''
+}
 
 function pick(name) {
   emit('update:modelValue', name)
@@ -194,7 +211,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             （内容已截断）
           </p>
         </div>
-        <p v-else class="text-[10px] text-muted-foreground pointer-events-none">暂无模型说明</p>
+        <p
+          v-else-if="summaryLoading"
+          class="text-[10px] text-muted-foreground pointer-events-none"
+        >
+          加载说明…
+        </p>
+        <p v-else class="text-[10px] text-muted-foreground pointer-events-none">
+          暂无模型说明（可在模型同名文件夹内放置 模型说明.txt）
+        </p>
       </div>
     </div>
 
@@ -240,6 +265,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             </div>
             <p class="mt-1.5 text-[10px] text-muted-foreground">
               共 {{ optionList.length }} 个 · 显示 {{ filteredOptions.length }} 个
+              <span v-if="folder === 'loras' && loraCompatMap">
+                · 灰字为不推荐（仍可选）
+              </span>
             </p>
           </div>
 
@@ -256,13 +284,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 :key="name"
                 type="button"
                 :disabled="disabled"
+                :title="loraCompatHint(name) || modelDisplayTitle(name)"
                 :class="
                   cn(
                     'flex flex-col overflow-hidden rounded-lg border text-left transition-colors',
                     'hover:border-primary/50 hover:bg-primary/5',
                     modelValue === name
                       ? 'border-primary ring-2 ring-primary/30 bg-primary/5'
-                      : 'border-border bg-muted/10',
+                      : loraCompatStatus(name) === 'not_recommended'
+                        ? 'border-amber-500/35 bg-muted/5 opacity-60 grayscale-[0.35]'
+                        : loraCompatStatus(name) === 'recommended'
+                          ? 'border-emerald-500/30 bg-emerald-500/5'
+                          : 'border-border bg-muted/10',
                   )
                 "
                 @click="pick(name)"
@@ -283,6 +316,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                     <span class="text-[9px] text-center leading-tight">无预览图</span>
                   </div>
                   <Badge
+                    v-if="loraCompatStatus(name) === 'not_recommended'"
+                    variant="outline"
+                    class="absolute top-1 left-1 text-[8px] px-1 py-0 border-amber-500/50 text-amber-700 dark:text-amber-300 bg-background/90"
+                  >
+                    不推荐
+                  </Badge>
+                  <Badge
+                    v-else-if="loraCompatStatus(name) === 'recommended'"
+                    variant="outline"
+                    class="absolute top-1 left-1 text-[8px] px-1 py-0 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 bg-background/90"
+                  >
+                    推荐
+                  </Badge>
+                  <Badge
                     v-if="modelValue === name"
                     class="absolute top-1 right-1 text-[9px] px-1 py-0"
                   >
@@ -296,7 +343,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                   >
                     {{ modelDisplayTitle(name) }}
                   </p>
-                  <p class="text-[9px] text-muted-foreground font-mono truncate" :title="name">
+                  <p
+                    :class="
+                      cn(
+                        'text-[9px] font-mono truncate',
+                        loraCompatStatus(name) === 'not_recommended'
+                          ? 'text-amber-700/80 dark:text-amber-300/80'
+                          : 'text-muted-foreground',
+                      )
+                    "
+                    :title="name"
+                  >
                     {{ name }}
                   </p>
                 </div>

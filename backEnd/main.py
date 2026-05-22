@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 import batch_service
@@ -28,18 +28,21 @@ import global_prompt_config_service
 import prompt_build_service
 import model_node_catalog_service
 import workflow_node_catalog_service
+import auth_service
 import campaign_service
 import prompt_preset_service
 import workflow_chain_service
 import workflow_meta_service
 from logging_config import setup_logging
 from routers.model_sources import router as model_sources_router
+from routers.model_manifest import router as model_manifest_router
 
 setup_logging()
 log = logging.getLogger("custom_project.api")
 
 app = FastAPI(title="ComfyUI CustomProject API", version="0.1.0")
 app.include_router(model_sources_router)
+app.include_router(model_manifest_router)
 
 
 @app.middleware("http")
@@ -56,6 +59,61 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 无需登录即可访问的 API（登录页、健康检查、图片预览 URL）
+_PUBLIC_API_PREFIXES = (
+    "/api/auth/login",
+    "/api/auth/admin/login",
+    "/api/health",
+    "/api/model-previews/",
+    "/api/view",
+)
+
+
+def _extract_access_token(request: Request) -> str:
+    token = (request.headers.get("X-Access-Token") or "").strip()
+    auth = request.headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip() or token
+    return token
+
+
+@app.middleware("http")
+async def require_auth_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    path = request.url.path
+    if not path.startswith("/api/"):
+        return await call_next(request)
+    for prefix in _PUBLIC_API_PREFIXES:
+        if path.startswith(prefix) or path == prefix.rstrip("/"):
+            return await call_next(request)
+    token = _extract_access_token(request)
+    if not auth_service.validate_session(token):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "未登录或会话已失效，请重新登录"},
+        )
+    if request.method == "DELETE" and not auth_service.is_admin(token):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "仅管理员可执行删除操作"},
+        )
+    if (
+        request.method == "POST"
+        and path.rstrip("/").endswith("/delete-items")
+        and not auth_service.is_admin(token)
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "仅管理员可执行删除操作"},
+        )
+    if path.startswith("/api/admin/") and not auth_service.is_admin(token):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "需要管理员权限"},
+        )
+    return await call_next(request)
 
 
 class CreateVariantBody(BaseModel):
@@ -160,7 +218,9 @@ class RandomPromptGroupBody(BaseModel):
     name: str = ""
     enabled: bool = True
     target: str = "positive"
+    pick_mode: str = "random"
     prompts: list[str] = []
+    weights: list[float] = Field(default_factory=list)
 
 
 class PromptMergeOptionsBody(BaseModel):
@@ -264,8 +324,121 @@ class BatchGridBody(BaseModel):
     filename_template: str | None = None
     base_overrides: dict[str, dict[str, Any]] | None = None
     sync_clip: bool = True
+    repeat_count: int | None = None
     stop_on_error: bool = True
     prompt_global_priority: bool | None = None
+
+
+class AuthLoginBody(BaseModel):
+    code: str = ""
+
+
+class AuthAdminLoginBody(BaseModel):
+    username: str = ""
+    password: str = ""
+
+
+class InviteCodeBody(BaseModel):
+    code: str = ""
+    note: str = ""
+    expires_at: str | None = None
+    max_uses: int = 1
+    single_quota_per_login: int = 5
+    enabled: bool = True
+
+
+class InviteCodeUpdateBody(BaseModel):
+    code: str | None = None
+    note: str | None = None
+    expires_at: str | None = None
+    max_uses: int | None = None
+    single_quota_per_login: int | None = None
+    used_count: int | None = None
+    enabled: bool | None = None
+
+
+def _forbid_invite_batch(request: Request) -> None:
+    try:
+        auth_service.assert_batch_allowed(_extract_access_token(request))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+
+def _forbid_invite_workflow_config(request: Request) -> None:
+    try:
+        auth_service.assert_workflow_config_allowed(_extract_access_token(request))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+
+def _require_single_quota(request: Request) -> None:
+    ok, err = auth_service.can_queue_single(_extract_access_token(request))
+    if not ok:
+        raise HTTPException(status_code=403, detail=err or "单图额度不足")
+
+
+@app.post("/api/auth/login")
+def api_auth_login(body: AuthLoginBody):
+    result = auth_service.login_with_code(body.code)
+    if not result.get("ok"):
+        raise HTTPException(status_code=401, detail=result.get("error") or "邀请码无效")
+    return result
+
+
+@app.post("/api/auth/admin/login")
+def api_auth_admin_login(body: AuthAdminLoginBody):
+    result = auth_service.login_admin(body.username, body.password)
+    if not result.get("ok"):
+        raise HTTPException(status_code=401, detail=result.get("error") or "登录失败")
+    return result
+
+
+@app.get("/api/auth/me")
+def api_auth_me(request: Request):
+    info = auth_service.session_info(_extract_access_token(request))
+    if not info.get("ok"):
+        raise HTTPException(status_code=401, detail="未登录")
+    return info
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout(request: Request):
+    auth_service.logout_session(_extract_access_token(request))
+    return {"ok": True}
+
+
+@app.get("/api/admin/invites")
+def api_admin_list_invites():
+    return {"ok": True, "invites": auth_service.list_invites()}
+
+
+@app.post("/api/admin/invites")
+def api_admin_create_invite(body: InviteCodeBody):
+    try:
+        row = auth_service.create_invite(body.model_dump())
+        return {"ok": True, "invite": row}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.put("/api/admin/invites/{invite_id}")
+def api_admin_update_invite(invite_id: str, body: InviteCodeUpdateBody):
+    try:
+        row = auth_service.update_invite(invite_id, body.model_dump(exclude_none=True))
+        return {"ok": True, "invite": row}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.delete("/api/admin/invites/{invite_id}")
+def api_admin_delete_invite(invite_id: str):
+    try:
+        auth_service.delete_invite(invite_id)
+        return {"ok": True}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.get("/api/health")
@@ -311,7 +484,8 @@ def api_list_workflow_variants():
 
 
 @app.post("/api/workflow-variants")
-def api_create_workflow_variant(body: CreateVariantBody):
+def api_create_workflow_variant(body: CreateVariantBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         entry = workflow_meta_service.create_variant(
             body.variant_id,
@@ -508,11 +682,41 @@ class NodeCatalogSaveBody(BaseModel):
     loras: list[dict[str, Any]] | None = None
 
 
+class CheckpointLoraCompatBody(BaseModel):
+    checkpoint: str = Field(description="Checkpoint 文件名")
+    recommended: list[str] = Field(default_factory=list)
+    not_recommended: list[str] = Field(default_factory=list)
+
+
 @app.put("/api/node-catalog")
 def api_put_node_catalog(body: NodeCatalogSaveBody):
     try:
         saved = model_node_catalog_service.save_model_catalog(body.model_dump(exclude_none=True))
         return {"ok": True, **saved}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.get("/api/node-catalog/lora-compat")
+def api_get_checkpoint_lora_compat(
+    checkpoint: str = Query(..., description="当前 Checkpoint 文件名"),
+):
+    try:
+        data = model_node_catalog_service.get_checkpoint_lora_compat(checkpoint)
+        return {"ok": True, **data}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.put("/api/node-catalog/lora-compat")
+def api_put_checkpoint_lora_compat(body: CheckpointLoraCompatBody):
+    try:
+        data = model_node_catalog_service.save_checkpoint_lora_compat(
+            body.checkpoint,
+            recommended=body.recommended,
+            not_recommended=body.not_recommended,
+        )
+        return {"ok": True, **data}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -539,7 +743,8 @@ class NodeCatalogBody(BaseModel):
 
 
 @app.put("/api/workflows/{workflow_id:path}/node-catalog")
-def api_put_workflow_node_catalog(workflow_id: str, body: NodeCatalogBody):
+def api_put_workflow_node_catalog(workflow_id: str, body: NodeCatalogBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         saved = workflow_node_catalog_service.save_workflow_catalog(
             workflow_id,
@@ -553,7 +758,8 @@ def api_put_workflow_node_catalog(workflow_id: str, body: NodeCatalogBody):
 
 
 @app.put("/api/workflows/{workflow_id:path}/essentials")
-def api_put_workflow_essentials(workflow_id: str, body: EssentialsBody):
+def api_put_workflow_essentials(workflow_id: str, body: EssentialsBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         payload = body.model_dump(exclude_none=True)
         if body.lora_chain is not None:
@@ -567,7 +773,8 @@ def api_put_workflow_essentials(workflow_id: str, body: EssentialsBody):
 
 
 @app.post("/api/workflows/{workflow_id:path}/lora-slots")
-def api_add_lora_slot(workflow_id: str, body: AddLoraSlotBody):
+def api_add_lora_slot(workflow_id: str, body: AddLoraSlotBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         data = workflow_chain_service.add_lora_slot(
             workflow_id,
@@ -595,7 +802,8 @@ def api_remove_lora_slot(workflow_id: str, node_id: str):
 
 
 @app.put("/api/workflows/{workflow_id:path}/meta")
-def api_update_workflow_meta(workflow_id: str, body: WorkflowMetaBody):
+def api_update_workflow_meta(workflow_id: str, body: WorkflowMetaBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         meta = workflow_meta_service.load_meta(workflow_id) or workflow_meta_service.get_effective_meta(
             workflow_id
@@ -613,7 +821,8 @@ def api_update_workflow_meta(workflow_id: str, body: WorkflowMetaBody):
 
 
 @app.put("/api/workflows/{workflow_id:path}")
-def api_save_workflow(workflow_id: str, body: OverridesBody):
+def api_save_workflow(workflow_id: str, body: OverridesBody, request: Request):
+    _forbid_invite_workflow_config(request)
     try:
         workflow_service.save_with_overrides(workflow_id, body.overrides)
         return {"ok": True, "id": workflow_id}
@@ -624,7 +833,9 @@ def api_save_workflow(workflow_id: str, body: OverridesBody):
 
 
 @app.post("/api/workflows/{workflow_id:path}/queue")
-def api_queue_workflow(workflow_id: str, body: OverridesBody):
+def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
+    _require_single_quota(request)
+    token = _extract_access_token(request)
     try:
         import history_service
 
@@ -697,12 +908,16 @@ def api_queue_workflow(workflow_id: str, body: OverridesBody):
             batch_prompts=runtime,
             prompt_picks=prompt_picks,
         )
-        return {
+        out = {
             "ok": True,
             "prompt_id": pid,
             "client_id": client_id,
             "number": result.get("number"),
         }
+        quota = auth_service.consume_single_quota(token)
+        if quota:
+            out.update(quota)
+        return out
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except ValueError as e:
@@ -771,6 +986,7 @@ def _batch_payload(body: BatchGridBody) -> dict:
         "filename_template": body.filename_template,
         "base_overrides": body.base_overrides or {},
         "sync_clip": body.sync_clip,
+        "repeat_count": body.repeat_count,
         "stop_on_error": body.stop_on_error,
         "prompt_global_priority": body.prompt_global_priority,
     }
@@ -789,7 +1005,8 @@ def _batch_payload(body: BatchGridBody) -> dict:
 
 
 @app.post("/api/workflows/{workflow_id:path}/batch/preview")
-def api_batch_preview(workflow_id: str, body: BatchGridBody):
+def api_batch_preview(workflow_id: str, body: BatchGridBody, request: Request):
+    _forbid_invite_batch(request)
     try:
         plan = batch_service.build_grid_plan(workflow_id, _batch_payload(body))
         return {"ok": True, "plan": plan}
@@ -800,7 +1017,8 @@ def api_batch_preview(workflow_id: str, body: BatchGridBody):
 
 
 @app.post("/api/workflows/{workflow_id:path}/batch")
-def api_start_batch(workflow_id: str, body: BatchGridBody):
+def api_start_batch(workflow_id: str, body: BatchGridBody, request: Request):
+    _forbid_invite_batch(request)
     try:
         payload = _batch_payload(body)
         plan = batch_service.build_grid_plan(workflow_id, payload)
@@ -968,6 +1186,14 @@ def api_delete_batch(batch_id: str):
     return batch_service.delete_batch(batch_id)
 
 
+@app.post("/api/jobs/{prompt_id}/cancel")
+def api_cancel_job(prompt_id: str):
+    try:
+        return job_service.cancel_job(prompt_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 @app.get("/api/jobs/{prompt_id}")
 def api_get_job(prompt_id: str):
     try:
@@ -1090,6 +1316,58 @@ def api_models(folder: str, with_previews: bool = Query(False)):
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+class ModelDescriptionBody(BaseModel):
+    name: str = ""
+    content: str = ""
+    source_url: str = ""
+
+
+@app.put("/api/models/{folder}/description")
+def api_save_model_description(folder: str, body: ModelDescriptionBody):
+    folder = str(folder or "").strip().lower()
+    name = str(body.name or "").strip()
+    if folder not in ("checkpoints", "loras"):
+        raise HTTPException(status_code=400, detail="folder 须为 checkpoints 或 loras")
+    if not name:
+        raise HTTPException(status_code=400, detail="缺少模型文件名 name")
+    try:
+        return model_preview_service.write_summary_txt_for_model(
+            folder,
+            name,
+            body.content,
+            source_url=body.source_url,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.delete("/api/models/{folder}/item")
+def api_delete_model_item(
+    folder: str,
+    name: str = Query(..., description="模型文件名"),
+    delete_assets: bool = Query(True, description="是否删除同名资源目录"),
+):
+    folder = str(folder or "").strip().lower()
+    if folder not in ("checkpoints", "loras"):
+        raise HTTPException(status_code=400, detail="folder 须为 checkpoints 或 loras")
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="缺少 name")
+    try:
+        result = model_preview_service.delete_model_from_disk(
+            folder,
+            name.strip(),
+            delete_asset_dirs=delete_assets,
+        )
+        model_node_catalog_service.remove_model_defaults(name.strip(), folder=folder)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"删除失败: {e}") from e
+
+
 @app.get("/api/models/{folder}/previews")
 def api_model_previews(folder: str, name: str = Query(..., description="模型文件名，与 ComfyUI 列表一致")):
     try:
@@ -1150,7 +1428,8 @@ def api_get_batch_task_batches(task_id: str, limit: int = Query(50, ge=1, le=200
 
 
 @app.post("/api/batch-tasks")
-def api_save_batch_task(body: SaveBatchTaskBody):
+def api_save_batch_task(body: SaveBatchTaskBody, request: Request):
+    _forbid_invite_batch(request)
     try:
         entry = batch_task_service.save_task(
             body.name,
@@ -1175,7 +1454,8 @@ def api_delete_batch_task(task_id: str):
 
 
 @app.post("/api/batch-tasks/run")
-def api_run_batch_tasks(body: RunBatchTasksBody):
+def api_run_batch_tasks(body: RunBatchTasksBody, request: Request):
+    _forbid_invite_batch(request)
     try:
         return batch_task_service.run_tasks_async(body.task_ids)
     except ValueError as e:
@@ -1196,7 +1476,8 @@ def api_get_campaign(campaign_id: str):
 
 
 @app.post("/api/campaigns")
-def api_create_campaign(body: CreateCampaignBody):
+def api_create_campaign(body: CreateCampaignBody, request: Request):
+    _forbid_invite_batch(request)
     tasks = [
         {
             "task_id": t.task_id,
@@ -1211,7 +1492,8 @@ def api_create_campaign(body: CreateCampaignBody):
 
 
 @app.post("/api/campaigns/{campaign_id}/run")
-def api_run_campaign(campaign_id: str):
+def api_run_campaign(campaign_id: str, request: Request):
+    _forbid_invite_batch(request)
     entry = campaign_service.get_campaign(campaign_id)
     if not entry:
         raise HTTPException(status_code=404, detail="任务计划不存在")

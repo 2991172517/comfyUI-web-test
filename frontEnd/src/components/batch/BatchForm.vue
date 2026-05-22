@@ -1,6 +1,7 @@
 <script setup>
 import { watch } from 'vue'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { isAdmin } from '@/composables/useAuth.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
 import { PARAM_HINTS } from '@/api/client.js'
 import Card from '@/components/ui/Card.vue'
@@ -84,7 +85,12 @@ watch(
           <Button variant="secondary" :disabled="!batch.isBatchRunning" @click="batch.cancelBatch">
             取消
           </Button>
-          <Button variant="destructive" :disabled="!batch.batch.batchId" @click="batch.deleteBatch">
+          <Button
+            v-if="isAdmin()"
+            variant="destructive"
+            :disabled="!batch.batch.batchId"
+            @click="batch.deleteBatch"
+          >
             删除本批输出
           </Button>
         </div>

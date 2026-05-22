@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import HistoryMetaPanel from '@/components/history/HistoryMetaPanel.vue'
 import Button from '@/components/ui/Button.vue'
 import { X } from 'lucide-vue-next'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -12,6 +13,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+const { saveOne } = useImageDownload()
 
 const subtitle = computed(() => {
   const m = props.meta
@@ -71,7 +73,15 @@ function onBackdrop(e) {
           />
         </div>
 
-        <footer class="shrink-0 border-t border-border px-4 py-3 text-right">
+        <footer class="shrink-0 border-t border-border px-4 py-3 flex justify-end gap-2">
+          <Button
+            v-if="imageUrl"
+            variant="default"
+            size="sm"
+            @click="saveOne({ url: imageUrl })"
+          >
+            保存
+          </Button>
           <Button variant="outline" size="sm" @click="emit('close')">关闭</Button>
         </footer>
       </div>

@@ -3,8 +3,8 @@ import { ref } from 'vue'
 import { watch } from 'vue'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
-import { api } from '@/api/client.js'
 import { buildSingleFavoritePayload } from '@/utils/favoritePayload.js'
+import { useImageDownload } from '@/composables/useImageDownload.js'
 import { useFavorites } from '@/composables/useFavorites.js'
 import Card from '@/components/ui/Card.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
@@ -14,11 +14,13 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import { isAdmin } from '@/composables/useAuth.js'
 
 const store = useAppStore()
 const history = useHistoryStore()
 const imageLightboxRef = ref(null)
 const { refreshFavorites } = useFavorites()
+const { saveOne, saveAll } = useImageDownload()
 
 watch(
   () => store.job.status,
@@ -44,29 +46,12 @@ function openJobImagePreview(index) {
   imageLightboxRef.value?.open(list, index)
 }
 
-async function downloadImage(img) {
-  try {
-    const res = await fetch(img.url)
-    if (!res.ok) throw new Error('下载失败')
-    const blob = await res.blob()
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = img.filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(a.href)
-    store.setMessage(`已保存: ${img.filename}`)
-  } catch (e) {
-    store.setMessage(e.message || '下载失败', true)
-  }
+function downloadImage(img) {
+  saveOne(img)
 }
 
-async function downloadAllImages() {
-  for (const img of store.job.images) {
-    await downloadImage(img)
-    await api.sleep(300)
-  }
+function downloadAllImages() {
+  saveAll(store.job.images)
 }
 
 async function onFavoriteToggled() {
@@ -76,8 +61,17 @@ async function onFavoriteToggled() {
 
 <template>
   <Card v-if="store.job.status !== 'idle'" class="mb-6">
-    <CardHeader class="flex flex-row items-center gap-3 space-y-0 pb-2">
+    <CardHeader class="flex flex-row flex-wrap items-center gap-3 space-y-0 pb-2">
       <CardTitle class="text-base">生成状态</CardTitle>
+      <Button
+        v-if="store.isGenerating"
+        variant="secondary"
+        size="sm"
+        class="ml-auto shrink-0"
+        @click="store.cancelWorkflow"
+      >
+        取消生成
+      </Button>
       <Badge
         :variant="
           store.job.status === 'completed'
@@ -123,7 +117,12 @@ async function onFavoriteToggled() {
           <h4 class="text-sm font-medium">生成结果（{{ store.job.images.length }}）</h4>
           <div class="flex gap-2">
             <Button variant="outline" size="sm" @click="downloadAllImages">全部保存</Button>
-            <Button variant="destructive" size="sm" @click="store.deleteOutputs">
+            <Button
+              v-if="isAdmin()"
+              variant="destructive"
+              size="sm"
+              @click="store.deleteOutputs"
+            >
               删除服务器图片
             </Button>
           </div>
