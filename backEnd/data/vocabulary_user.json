@@ -1,0 +1,11 @@
+{
+  "defaultWeight": 1.0,
+  "deleted": [],
+  "prompts": [
+    {
+      "value": "flower",
+      "name": "测试花纹",
+      "categoryId": "41"
+    }
+  ]
+}

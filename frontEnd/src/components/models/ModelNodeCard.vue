@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, toRef } from 'vue'
+import { useIntersectionObserver } from '@vueuse/core'
 import { FileText } from 'lucide-vue-next'
 import Card from '@/components/ui/Card.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
@@ -42,10 +43,21 @@ const emit = defineEmits([
 ])
 
 const editOpen = ref(false)
+const cardRoot = ref(null)
+const assetsVisible = ref(false)
+
+useIntersectionObserver(
+  cardRoot,
+  ([entry]) => {
+    if (entry?.isIntersecting) assetsVisible.value = true
+  },
+  { rootMargin: '240px 0px' },
+)
 
 const { previews, summary, loading, previewIndex, reload } = useModelAssets(
   props.folder,
   toRef(props, 'name'),
+  { enabled: assetsVisible },
 )
 
 const summaryDisplay = computed(() => {
@@ -87,7 +99,8 @@ function onDescriptionSaved() {
 </script>
 
 <template>
-  <Card class="flex flex-col overflow-hidden transition-shadow">
+  <div ref="cardRoot" class="min-h-0">
+    <Card class="flex flex-col overflow-hidden transition-shadow h-full">
     <CardHeader class="pb-2 space-y-1">
       <div class="flex items-start gap-2">
         <div class="min-w-0 flex-1">
@@ -122,7 +135,7 @@ function onDescriptionSaved() {
 
     <CardContent class="flex-1 flex flex-col gap-3 pt-0">
       <ModelPreviewPanel
-        v-if="previews.length || loading"
+        v-if="assetsVisible && (previews.length || loading)"
         :folder="folder"
         :model-name="name"
         :previews="previews"
@@ -130,6 +143,12 @@ function onDescriptionSaved() {
         v-model:index="previewIndex"
         size="md"
       />
+      <div
+        v-else-if="!assetsVisible"
+        class="h-40 rounded-md border border-dashed border-border flex items-center justify-center text-[10px] text-muted-foreground px-3 text-center"
+      >
+        预览待加载…
+      </div>
       <div
         v-else
         class="h-40 rounded-md border border-dashed border-border flex items-center justify-center text-[10px] text-muted-foreground px-3 text-center"
@@ -154,7 +173,7 @@ function onDescriptionSaved() {
         <pre class="whitespace-pre-wrap break-words">{{ summaryDisplay.content }}</pre>
         <p v-if="summaryDisplay.truncated" class="text-[10px] mt-1 opacity-70">（已截断）</p>
       </div>
-      <p v-else-if="!loading" class="text-[10px] text-muted-foreground">
+      <p v-else-if="assetsVisible && !loading" class="text-[10px] text-muted-foreground">
         <template v-if="manage">暂无说明，点击「说明」编辑并保存。</template>
         <template v-else>
           在 models/{{ folder }}/ 下建立与主文件名同名的文件夹，放入预览图与 模型说明.txt。
@@ -207,4 +226,5 @@ function onDescriptionSaved() {
       @saved="onDescriptionSaved"
     />
   </Card>
+  </div>
 </template>

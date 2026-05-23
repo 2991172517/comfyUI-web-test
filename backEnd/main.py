@@ -36,6 +36,7 @@ import workflow_meta_service
 from logging_config import setup_logging
 from routers.model_sources import router as model_sources_router
 from routers.model_manifest import router as model_manifest_router
+from routers.vocabulary import router as vocabulary_router
 
 setup_logging()
 log = logging.getLogger("custom_project.api")
@@ -43,6 +44,23 @@ log = logging.getLogger("custom_project.api")
 app = FastAPI(title="ComfyUI CustomProject API", version="0.1.0")
 app.include_router(model_sources_router)
 app.include_router(model_manifest_router)
+app.include_router(vocabulary_router)
+
+
+@app.on_event("startup")
+def _warm_vocabulary_index() -> None:
+    """后台预热词库索引（首次或 manifest 变更时构建）。"""
+    import vocabulary as vocabulary_service
+
+    def _run() -> None:
+        try:
+            vocabulary_service.ensure_index()
+        except FileNotFoundError as e:
+            log.warning("词库索引跳过: %s", e)
+        except Exception:
+            log.exception("词库索引预热失败")
+
+    threading.Thread(target=_run, name="vocabulary-index", daemon=True).start()
 
 
 @app.middleware("http")

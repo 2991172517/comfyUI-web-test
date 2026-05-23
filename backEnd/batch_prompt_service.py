@@ -40,9 +40,21 @@ def save_batch_prompt_config(data: dict) -> dict:
     return data
 
 
+def _weight_slot_count(prompts: list[str]) -> int:
+    """词条池（单行多 tag）按 token 数；多方案模式按方案行数。"""
+    if len(prompts) <= 1:
+        from reference_pick_service import split_prompt_tokens
+
+        line = prompts[0] if prompts else ""
+        tokens = split_prompt_tokens(line)
+        return max(len(tokens), 1)
+    return len(prompts)
+
+
 def _normalize_group_weights(prompts: list[str], raw_weights: list | None) -> list[float]:
+    slot_count = _weight_slot_count(prompts)
     weights: list[float] = []
-    for i in range(len(prompts)):
+    for i in range(slot_count):
         default = 1.0
         if raw_weights and i < len(raw_weights):
             try:

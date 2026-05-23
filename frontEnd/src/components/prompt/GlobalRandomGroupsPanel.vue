@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
-import { useDebouncedSave } from '@/composables/useDebouncedSave.js'
+import { PROMPT_AUTO_SAVE_DEBOUNCE_MS, useDebouncedSave } from '@/composables/useDebouncedSave.js'
 import Switch from '@/components/ui/Switch.vue'
 import PromptRandomGroupList from '@/components/prompt/PromptRandomGroupList.vue'
 import {
@@ -55,7 +55,9 @@ async function persist() {
   notifyGlobalPromptSaved()
 }
 
-const { saving, markReady, schedule, flush } = useDebouncedSave(persist, { delay: 450 })
+const { saving, pending, markReady, schedule, flush } = useDebouncedSave(persist, {
+  delay: PROMPT_AUTO_SAVE_DEBOUNCE_MS,
+})
 
 watch(
   randomGroups,
@@ -91,7 +93,7 @@ async function setMasterEnabled(enabled) {
 
 onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 
-defineExpose({ load })
+defineExpose({ load, flush })
 </script>
 
 <template>
@@ -122,8 +124,10 @@ defineExpose({ load })
     </div>
 
     <p class="text-xs text-muted-foreground leading-relaxed">
-      随机组在合并时始终参与（与「启用全局提示词」无关）；正/负全文块需开启全局开关。修改后自动保存。
-      <span v-if="saving && !masterSaving" class="text-primary">保存中…</span>
+      随机组在合并时始终参与（与「启用全局提示词」无关）；正/负全文块需开启全局开关。修改后自动保存（约
+      {{ PROMPT_AUTO_SAVE_DEBOUNCE_MS / 1000 }} 秒防抖）。
+      <span v-if="pending && !saving && !masterSaving" class="text-muted-foreground">待保存…</span>
+      <span v-else-if="saving && !masterSaving" class="text-primary">保存中…</span>
     </p>
     <p v-if="loading" class="text-sm text-muted-foreground">加载中…</p>
     <PromptRandomGroupList

@@ -25,3 +25,8 @@ SINGLE_OUTPUT_PREFIX = "custom_single"
 
 # 模型参考图扩展名（文件放在 ComfyUI/models/{checkpoints|loras}/ 下，与模型同目录）
 MODEL_PREVIEW_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
+
+# 提示词词库（manifest → SQLite 索引，供输入补全）
+VOCABULARY_MANIFEST_PATH = PROJECT_ROOT / "prompt" / "jsonData" / "manifest.json"
+VOCABULARY_DB_PATH = Path(__file__).parent / "data" / "vocabulary.db"
+VOCABULARY_USER_PATH = Path(__file__).parent / "data" / "vocabulary_user.json"

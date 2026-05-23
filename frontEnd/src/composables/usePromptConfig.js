@@ -1,5 +1,7 @@
 /** 提示词配置：当次/预设/全局 统一结构 */
 
+import { splitPromptTokens } from '@/lib/promptTokens.js'
+
 export function emptyMergeOptions() {
   return {
     global_before_workflow: false,
@@ -43,9 +45,18 @@ function normalizeWeight(value, fallback = 1) {
   return n
 }
 
+function weightSlotCount(prompts) {
+  const lines = (prompts || []).map((p) => String(p).trim()).filter(Boolean)
+  if (lines.length <= 1) {
+    return Math.max(splitPromptTokens(lines[0] || '').length, 1)
+  }
+  return lines.length
+}
+
 function normalizeGroupWeights(prompts, rawWeights) {
+  const n = weightSlotCount(prompts)
   const weights = []
-  for (let i = 0; i < prompts.length; i++) {
+  for (let i = 0; i < n; i++) {
     weights.push(normalizeWeight(rawWeights?.[i], 1))
   }
   return weights

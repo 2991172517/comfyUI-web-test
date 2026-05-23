@@ -4,6 +4,7 @@ node_modules/
 frontEnd/dist/
 frontEnd/dist-ssr/
 frontend/dist/
+frontEnd/UI参考/**
 *.local
 
 # ========== Python 后端（勿提交虚拟环境与缓存）==========
@@ -28,6 +29,10 @@ backend/.venv/
 # ========== 日志与本地输出 ==========
 logs/
 *.log
+
+# ========== 脚本本地大文件 / 备份 ==========
+scripts/category_标签库_*/
+**/manifest.json.bak
 
 # ========== 密钥 ==========
 config/civitai_token.txt

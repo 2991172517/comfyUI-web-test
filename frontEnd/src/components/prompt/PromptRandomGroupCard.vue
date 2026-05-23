@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import Input from '@/components/ui/Input.vue'
-import Label from '@/components/ui/Label.vue'
+import PoolPickWeightPanel from '@/components/prompt/PoolPickWeightPanel.vue'
 import PromptTextarea from '@/components/prompt/PromptTextarea.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -30,6 +30,16 @@ const badgeText = computed(() => groupModeBadge(props.group))
 const modeHint = computed(() => groupModeDescription(props.group))
 const isRandom = computed(() => (props.group.pick_mode || 'random') !== 'sequential')
 const isPool = computed(() => mode.value === 'pool')
+
+const poolLine = computed(() => String((props.group.prompts || [])[0] || ''))
+const poolTokens = computed(() => splitPromptTokens(poolLine.value))
+
+const poolPickWeights = computed(() => {
+  const raw = props.group.weights || []
+  return poolTokens.value.map((_, i) => raw[i] ?? 1)
+})
+
+const showPoolPickWeights = computed(() => isPool.value && isRandom.value)
 
 function update(patch) {
   emit('update:group', { ...props.group, ...patch })
@@ -61,30 +71,21 @@ function updateWeight(i, val) {
   update({ weights })
 }
 
-function updatePoolWeightsText(val) {
-  const line = (props.group.prompts || [])[0] || ''
-  const k = splitPromptTokens(line).length || 1
-  const parts = String(val || '')
-    .split(/[,，]\s*/)
-    .map((x) => x.trim())
-    .filter((x) => x !== '')
+function updatePoolTokenWeight(i, val) {
+  const k = poolTokens.value.length
+  if (!k) return
   const weights = []
-  for (let i = 0; i < k; i++) {
-    const n = Number(parts[i])
-    weights.push(Number.isFinite(n) && n >= 0 ? n : 1)
-  }
+  const raw = props.group.weights || []
+  for (let j = 0; j < k; j++) weights.push(raw[j] ?? 1)
+  const n = Number(val)
+  weights[i] = Number.isFinite(n) && n >= 0 ? n : 1
   update({ weights })
 }
 
-const poolWeightsText = computed(() => {
-  if (!isPool.value) return ''
-  const line = (props.group.prompts || [])[0] || ''
-  const k = splitPromptTokens(line).length || 1
-  const raw = props.group.weights || []
-  const out = []
-  for (let i = 0; i < k; i++) out.push(raw[i] ?? 1)
-  return out.join(', ')
-})
+function bumpSchemeWeight(i, delta) {
+  const current = (props.group.weights || [])[i] ?? 1
+  updateWeight(i, current + delta)
+}
 
 function addCandidate() {
   const prompts = [...(props.group.prompts || []), '']
@@ -188,20 +189,25 @@ function onPickModeChange(val) {
         placeholder="词条池，英文或中文逗号分隔"
         @update:model-value="updatePrompt(0, $event)"
       />
-      <div v-if="isRandom" class="space-y-1">
-        <Label class="text-[10px] text-muted-foreground">词条权重（逗号分隔，与词条顺序对应，默认 1）</Label>
-        <Input
-          class="h-8 text-xs font-mono"
-          :model-value="poolWeightsText"
-          :disabled="disabled"
-          placeholder="如 1, 5, 1, 2"
-          @update:model-value="updatePoolWeightsText"
-        />
-      </div>
+      <PoolPickWeightPanel
+        v-if="showPoolPickWeights"
+        :tokens="poolTokens"
+        :weights="poolPickWeights"
+        :disabled="disabled"
+        @update-weight="updatePoolTokenWeight"
+      />
     </template>
 
     <template v-else>
       <div class="space-y-1.5">
+        <div
+          v-if="isRandom"
+          class="flex gap-1.5 items-center pr-8 text-[10px] text-muted-foreground"
+        >
+          <span class="w-8 shrink-0 text-right">#</span>
+          <span class="flex-1">候选方案</span>
+          <span class="w-[4.5rem] shrink-0 text-center">抽中权重</span>
+        </div>
         <div
           v-for="(line, i) in group.prompts"
           :key="i"
@@ -216,17 +222,39 @@ function onPickModeChange(val) {
             placeholder="候选方案，逗号分隔多个 tag"
             @update:model-value="updatePrompt(i, $event)"
           />
-          <Input
+          <div
             v-if="isRandom"
-            type="number"
-            min="0"
-            step="0.1"
-            class="h-8 w-14 shrink-0 text-xs text-center"
-            :model-value="(group.weights || [])[i] ?? 1"
-            :disabled="disabled"
-            title="随机权重，越大越容易被抽到"
-            @update:model-value="updateWeight(i, $event)"
-          />
+            class="flex shrink-0 items-center gap-0.5 pt-1"
+          >
+            <button
+              type="button"
+              class="h-7 w-6 rounded text-xs text-muted-foreground hover:bg-muted disabled:opacity-40"
+              :disabled="disabled"
+              aria-label="降低方案抽中权重"
+              @click="bumpSchemeWeight(i, -1)"
+            >
+              −
+            </button>
+            <Input
+              type="number"
+              min="0"
+              step="0.1"
+              class="h-7 w-12 text-xs text-center"
+              :model-value="(group.weights || [])[i] ?? 1"
+              :disabled="disabled"
+              title="方案抽中权重，越大越容易被抽到"
+              @update:model-value="updateWeight(i, $event)"
+            />
+            <button
+              type="button"
+              class="h-7 w-6 rounded text-xs text-muted-foreground hover:bg-muted disabled:opacity-40"
+              :disabled="disabled"
+              aria-label="提高方案抽中权重"
+              @click="bumpSchemeWeight(i, 1)"
+            >
+              +
+            </button>
+          </div>
           <IconDeleteButton
             size="sm"
             :disabled="disabled || (group.prompts || []).length <= 1"

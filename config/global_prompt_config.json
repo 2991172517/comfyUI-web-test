@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "enabled": false,
+  "enabled": true,
   "positive": "",
   "negative": "",
   "random_groups": [
@@ -11,9 +11,18 @@
       "target": "positive",
       "pick_mode": "random",
       "prompts": [
-        "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, thighhighs, lace stockings, fishnet stockings, garter stockings"
+        "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, (thighhighs:1.15), lace stockings, fishnet stockings, garter stockings"
       ],
       "weights": [
+        0.0,
+        4.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     },
@@ -27,6 +36,15 @@
         "soft lighting, cinematic lighting, rim light, soft backlight, window light, golden hour lighting, volumetric lighting, soft glow, dreamy atmosphere, romantic atmosphere"
       ],
       "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     },
@@ -40,6 +58,15 @@
         "soft smooth skin, matte skin, silky skin, detailed stocking texture, soft fabric texture, delicate lace texture, clean thick lineart, sharp outlines, smooth rendering, fine hair strands"
       ],
       "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     },
@@ -50,9 +77,18 @@
       "target": "positive",
       "pick_mode": "random",
       "prompts": [
-        "front view,side view,back view,three‑quarter view,oblique view,from below,from above,slightly low angle,slightly high angle,straight‑on view"
+        "front view, side view, back view, three‑quarter view, oblique view, from below, from above, slightly low angle, slightly high angle, straight‑on view"
       ],
       "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     },
@@ -66,6 +102,15 @@
         "soft smile, shy smile, light blush, embarrassed expression, bashful expression, excited expression, happy smile, teasing smile, seductive smile, flushed face"
       ],
       "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     },
@@ -76,9 +121,18 @@
       "target": "positive",
       "pick_mode": "random",
       "prompts": [
-        "full body shot,full body view,full body portrait,full body framing,full body composition,standing full body,full body from head to toe,full body with legs visible,full body centered,full body on simple background"
+        "full body shot, full body view, full body portrait, full body framing, full body composition, standing full body, full body from head to toe, full body with legs visible, full body centered, full body on simple background"
       ],
       "weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
       ]
     }

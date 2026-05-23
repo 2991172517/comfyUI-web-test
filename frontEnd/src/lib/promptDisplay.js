@@ -1,3 +1,6 @@
+import { isMutedStoredToken } from '@/lib/promptMutedTag.js'
+import { lookupKeyForVocabulary } from '@/lib/promptTagWeight.js'
+
 /** 与后端 split_prompt_tokens 一致：优先按逗号拆词条 */
 const COMMA_RE = /[,，]\s*/
 
@@ -20,8 +23,9 @@ export function dedupePromptTokens(tokens) {
   let removed = 0
   for (const raw of tokens) {
     const t = String(raw).trim()
-    if (!t) continue
-    const key = t.toLowerCase()
+    if (!t || isMutedStoredToken(t)) continue
+    const key = lookupKeyForVocabulary(t).toLowerCase()
+    if (!key) continue
     if (seen.has(key)) {
       removed += 1
       continue

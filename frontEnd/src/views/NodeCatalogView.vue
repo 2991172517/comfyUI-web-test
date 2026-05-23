@@ -210,7 +210,7 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
         </p>
 
         <div
-          v-show="activeTab === 'checkpoint' && filteredCheckpoints.length"
+          v-if="activeTab === 'checkpoint' && filteredCheckpoints.length"
           class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
         >
           <ModelNodeCard
@@ -240,7 +240,7 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
         </div>
 
         <div
-          v-show="activeTab === 'lora' && filteredLoras.length"
+          v-if="activeTab === 'lora' && filteredLoras.length"
           class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
         >
           <ModelNodeCard

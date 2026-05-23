@@ -10,6 +10,35 @@ _COMMA_RE = re.compile(r"[,，]\s*")
 # 旧配置可能用斜杠；仅在没有逗号时兼容
 _SLASH_RE = re.compile(r"\s*/\s*")
 
+# 前端 Tag 编辑器双击屏蔽时写入此前缀；生图合并时跳过
+MUTED_TOKEN_PREFIX = "!"
+
+
+def is_muted_prompt_token(token: str) -> bool:
+    return str(token or "").strip().startswith(MUTED_TOKEN_PREFIX)
+
+
+def strip_muted_prefix(token: str) -> str:
+    t = str(token or "").strip()
+    if is_muted_prompt_token(t):
+        return t[len(MUTED_TOKEN_PREFIX) :].strip()
+    return t
+
+
+def active_prompt_tokens(tokens: list[str]) -> list[str]:
+    """去掉屏蔽词条，供随机抽取 / 合并入 CLIP。"""
+    out: list[str] = []
+    for raw in tokens:
+        t = str(raw).strip()
+        if not t or is_muted_prompt_token(t):
+            continue
+        out.append(t)
+    return out
+
+
+def _active_token_indices(tokens: list[str]) -> list[int]:
+    return [i for i, raw in enumerate(tokens) if str(raw).strip() and not is_muted_prompt_token(raw)]
+
 
 def split_prompt_tokens(text: str) -> list[str]:
     """
@@ -40,17 +69,20 @@ def flatten_prompt_to_tokens(text: str) -> list[str]:
 
 
 def _token_dedupe_key(token: str) -> str:
-    return str(token).strip().casefold()
+    t = strip_muted_prefix(str(token).strip())
+    return t.casefold()
 
 
 def dedupe_prompt_tokens(tokens: list[str]) -> tuple[list[str], int]:
-    """保留首次出现顺序；key 为 strip + casefold，O(n)。"""
+    """保留首次出现顺序；key 为 strip + casefold，O(n)。屏蔽词条（! 前缀）不参与合并。"""
     seen: set[str] = set()
     out: list[str] = []
     removed = 0
     for raw in tokens:
         t = str(raw).strip()
         if not t:
+            continue
+        if is_muted_prompt_token(t):
             continue
         key = _token_dedupe_key(t)
         if key in seen:
@@ -168,7 +200,7 @@ def resolve_sequential_group_pick(
     }
 
     if len(pool) == 1:
-        tokens = split_prompt_tokens(pool[0])
+        tokens = active_prompt_tokens(split_prompt_tokens(pool[0]))
         if not tokens:
             return "", [], base_rec
         idx = seq_index % len(tokens)
@@ -186,7 +218,7 @@ def resolve_sequential_group_pick(
 
     idx = seq_index % len(pool)
     line = pool[idx]
-    tokens = split_prompt_tokens(line)
+    tokens = active_prompt_tokens(split_prompt_tokens(line))
     merged = join_prompt_tokens(tokens)
     record = {
         **base_rec,
@@ -225,11 +257,14 @@ def resolve_random_group_pick(
     }
 
     if len(pool) == 1:
-        tokens = split_prompt_tokens(pool[0])
+        all_tokens = split_prompt_tokens(pool[0])
+        active_idx = _active_token_indices(all_tokens)
+        tokens = [all_tokens[i] for i in active_idx]
         if not tokens:
             return "", [], base_rec
-        weights = _weights_for_tokens(group, len(tokens))
-        idx = _weighted_index(weights, rng)
+        weights = _weights_for_tokens(group, len(all_tokens))
+        pick_weights = [weights[i] for i in active_idx]
+        idx = _weighted_index(pick_weights, rng)
         chosen = tokens[idx]
         merged = chosen
         record = {
@@ -238,7 +273,7 @@ def resolve_random_group_pick(
             "candidate_count": 1,
             "token_index": idx,
             "token_count": len(tokens),
-            "token_weight": weights[idx],
+            "token_weight": pick_weights[idx],
             "tokens": [chosen],
             "text": merged,
         }
@@ -247,7 +282,7 @@ def resolve_random_group_pick(
     weights = _weights_for_pool(group, len(pool))
     idx = _weighted_index(weights, rng)
     line = pool[idx]
-    tokens = split_prompt_tokens(line)
+    tokens = active_prompt_tokens(split_prompt_tokens(line))
     merged = join_prompt_tokens(tokens)
     record = {
         **base_rec,

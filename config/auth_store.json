@@ -2,7 +2,7 @@
   "admins": [
     {
       "id": "1",
-      "username": "qwer",
+      "username": "admin",
       "password_hash": "4cda96247e96e1b4487b4881e84e38ad617d18e1a74ff8461afe481bd3e40510",
       "enabled": true,
       "note": "默认管理员，密码 admin123（请尽快修改 password_hash 或禁用此账号）"
@@ -14,12 +14,12 @@
       "code": "COMFY-8K2M",
       "note": "邀请码示例",
       "expires_at": null,
-      "max_uses": 3,
+      "max_uses": 30,
       "single_quota_per_login": 2,
-      "used_count": 2,
+      "used_count": 4,
       "enabled": true,
       "created_at": "2026-05-21T00:00:00+00:00",
-      "last_used_at": "2026-05-21T16:37:00.519662+00:00"
+      "last_used_at": "2026-05-23T14:10:45.168397+00:00"
     },
     {
       "id": "2",

@@ -7,7 +7,7 @@
       "description": "",
       "fixed": {
         "positive": {
-          "prefix": "masterpiece, best quality, absurdres,\n1girl, solo,\n(mature big sister:1.25), (gentle onee-san:1.2), elegant mature woman,\ngolden blonde long hair, side-swept hair covering one eye,\ngreen eyes, droopy eyes, teasing smile,\nvoluptuous figure, large breasts, tight clothes,\nslim narrow waist, gently wide hips,\n(long slender legs:1.2), tall body proportion, beautiful leg curves,\nblack off-shoulder nun dress, exposed shoulders, tight robe,\nlong black skirt with side slit,\ngolden crucifix necklace,\nstanding gracefully, slight contrapposto,\nthighhighs, window light, soft fabric texture,\nfrom below, full body centered, simple background",
+          "prefix": "masterpiece, best quality, absurdres, 1girl, solo, (mature big sister:1.25), (gentle onee-san:1.2), elegant mature woman, golden blonde long hair, side-swept hair covering one eye, green eyes, droopy eyes, teasing smile, voluptuous figure, large breasts, tight clothes, slim narrow waist, gently wide hips, (long slender legs:1.2), tall body proportion, beautiful leg curves, black off-shoulder nun dress, exposed shoulders, tight robe, long black skirt with side slit, golden crucifix necklace, standing gracefully, slight contrapposto, thighhighs, window light, soft fabric texture, from below, full body centered, simple background",
           "suffix": ""
         },
         "negative": {
@@ -16,7 +16,7 @@
         }
       },
       "random_groups": [],
-      "updated_at": "2026-05-21T14:22:13.629100+00:00",
+      "updated_at": "2026-05-23T10:57:13.620650+00:00",
       "positive": "",
       "negative": "",
       "merge": {

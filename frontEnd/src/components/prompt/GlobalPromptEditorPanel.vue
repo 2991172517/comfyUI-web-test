@@ -2,7 +2,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
-import { useDebouncedSave } from '@/composables/useDebouncedSave.js'
+import { PROMPT_AUTO_SAVE_DEBOUNCE_MS, useDebouncedSave } from '@/composables/useDebouncedSave.js'
 import Label from '@/components/ui/Label.vue'
 import Switch from '@/components/ui/Switch.vue'
 import PromptTextarea from '@/components/prompt/PromptTextarea.vue'
@@ -41,7 +41,9 @@ async function persist() {
   notifyGlobalPromptSaved()
 }
 
-const { saving, markReady, schedule } = useDebouncedSave(persist, { delay: 450 })
+const { saving, pending, markReady, schedule, flush } = useDebouncedSave(persist, {
+  delay: PROMPT_AUTO_SAVE_DEBOUNCE_MS,
+})
 
 watch(
   globalCfg,
@@ -51,7 +53,7 @@ watch(
 
 onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 
-defineExpose({ load })
+defineExpose({ load, flush })
 </script>
 
 <template>
@@ -59,8 +61,9 @@ defineExpose({ load })
     <p v-if="loading" class="text-sm text-muted-foreground">加载中…</p>
     <template v-else>
       <p class="text-[11px] text-muted-foreground">
-        修改后自动保存。
-        <span v-if="saving" class="text-primary">保存中…</span>
+        修改后自动保存（约 {{ PROMPT_AUTO_SAVE_DEBOUNCE_MS / 1000 }} 秒防抖）。
+        <span v-if="pending && !saving" class="text-muted-foreground">待保存…</span>
+        <span v-else-if="saving" class="text-primary">保存中…</span>
       </p>
       <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
         <Switch v-model="globalCfg.enabled" aria-label="启用全局提示词" />

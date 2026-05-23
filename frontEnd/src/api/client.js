@@ -13,7 +13,7 @@ function authHeaders() {
 }
 
 async function request(path, options = {}) {
-  const { skipAuthRedirect, ...fetchOptions } = options
+  const { skipAuthRedirect, signal, ...fetchOptions } = options
   const isPublicAuth =
     path === '/api/auth/login' || path === '/api/auth/admin/login'
   const res = await fetch(path, {
@@ -22,6 +22,7 @@ async function request(path, options = {}) {
       ...(isPublicAuth ? {} : authHeaders()),
       ...fetchOptions.headers,
     },
+    signal,
     ...fetchOptions,
   })
   const data = await res.json().catch(() => ({}))
@@ -412,6 +413,43 @@ export const api = {
   toggleFavorite: (body) =>
     request('/api/favorites/toggle', { method: 'POST', body: JSON.stringify(body) }),
   deleteFavorite: (id) => request(`/api/favorites/${id}`, { method: 'DELETE' }),
+  vocabularySuggest: (q, { limit = 12, signal } = {}) => {
+    const params = new URLSearchParams({ q: String(q || ''), limit: String(limit) })
+    return request(`/api/vocabulary/suggest?${params}`, { signal })
+  },
+  vocabularyResolve: (values) =>
+    request('/api/vocabulary/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ values }),
+    }),
+  vocabularyStats: () => request('/api/vocabulary/stats'),
+  vocabularyRebuild: () => request('/api/vocabulary/rebuild', { method: 'POST' }),
+  vocabularyCategoryTree: () => request('/api/vocabulary/categories/tree'),
+  vocabularyListPrompts: (categoryId, { q = '', offset = 0, limit = 80 } = {}) => {
+    const params = new URLSearchParams({
+      categoryId: String(categoryId),
+      q: String(q || ''),
+      offset: String(offset),
+      limit: String(limit),
+    })
+    return request(`/api/vocabulary/prompts?${params}`)
+  },
+  vocabularyCreatePrompt: (body) =>
+    request('/api/vocabulary/prompts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  vocabularyDeletePrompt: (body) =>
+    request('/api/vocabulary/prompts', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    }),
+  vocabularyGetSettings: () => request('/api/vocabulary/settings'),
+  vocabularyUpdateSettings: (defaultWeight) =>
+    request('/api/vocabulary/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ defaultWeight }),
+    }),
   sleep,
 }
 

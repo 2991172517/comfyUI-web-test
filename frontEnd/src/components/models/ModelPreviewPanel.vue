@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import LazyImage from '@/components/ui/LazyImage.vue'
 import { cn } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, ImageOff, ZoomIn } from 'lucide-vue-next'
 
@@ -65,12 +66,14 @@ const sizeClass = {
       </div>
     </template>
     <template v-else-if="previews.length">
-      <img
-        :src="previews[currentIndex].url"
-        :alt="modelName"
-        class="h-full w-full cursor-zoom-in object-contain bg-black/20"
-        @click="openZoom"
-      />
+      <div class="h-full w-full cursor-zoom-in" @click="openZoom">
+        <LazyImage
+          :src="previews[currentIndex].url"
+          :alt="modelName"
+          class="h-full w-full object-contain bg-black/20"
+          fetch-priority="low"
+        />
+      </div>
       <Button
         v-if="previews.length > 1"
         variant="secondary"

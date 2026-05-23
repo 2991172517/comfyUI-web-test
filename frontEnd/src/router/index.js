@@ -86,6 +86,12 @@ const routes = [
         meta: { title: '提示词', description: '全局提示词、预设库' },
       },
       {
+        path: 'settings/tags',
+        name: 'tag-manage',
+        component: () => import('@/views/TagManagerView.vue'),
+        meta: { title: 'Tag 词库管理', description: '分类浏览、筛选搜索、增删词条与默认权重' },
+      },
+      {
         path: 'models',
         name: 'model-manage',
         component: () => import('@/views/NodeCatalogView.vue'),

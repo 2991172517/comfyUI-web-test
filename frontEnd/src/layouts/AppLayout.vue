@@ -11,7 +11,7 @@ import {
   ListTodo,
   Boxes,
   KeyRound,
-  Globe,
+  Tags,
 } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { allowsBatch, authRole, getAccessToken, isAdmin, setAuthSession } from '@/composables/useAuth.js'
@@ -70,7 +70,7 @@ const nav = computed(() => {
     { to: '/history', label: '历史记录', icon: History },
     { to: '/favorites', label: '收藏', icon: Star },
     { to: '/models', label: '模型管理', icon: Boxes },
-    { to: '/models/civitai', label: 'C 站模型库', icon: Globe },
+    { to: '/settings/tags', label: 'Tag 词库管理', icon: Tags },
   ]
   if (isAdmin()) {
     items.push({ to: '/admin/invites', label: '邀请码管理', icon: KeyRound })

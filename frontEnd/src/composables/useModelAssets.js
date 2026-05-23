@@ -1,8 +1,9 @@
 import { ref, unref, watch } from 'vue'
 import { api } from '@/api/client.js'
 
-/** 加载模型参考图 + 同名目录下首个 txt 说明 */
-export function useModelAssets(folder, modelName) {
+/** 加载模型参考图 + 同名目录下首个 txt 说明；enabled 为 false 时不请求（配合可见性懒加载） */
+export function useModelAssets(folder, modelName, options = {}) {
+  const enabled = options.enabled ?? ref(true)
   const previews = ref([])
   const summary = ref(null)
   const loading = ref(false)
@@ -34,8 +35,11 @@ export function useModelAssets(folder, modelName) {
   }
 
   watch(
-    () => [unref(folder), unref(modelName)],
-    load,
+    () => [unref(folder), unref(modelName), unref(enabled)],
+    ([f, name, en]) => {
+      if (!en || !f || !name) return
+      load()
+    },
     { immediate: true },
   )
 

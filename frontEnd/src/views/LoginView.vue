@@ -11,6 +11,7 @@ import CardHeader from '@/components/ui/CardHeader.vue'
 import CardTitle from '@/components/ui/CardTitle.vue'
 import CardDescription from '@/components/ui/CardDescription.vue'
 import CardContent from '@/components/ui/CardContent.vue'
+import PublicImageBackground from '@/components/background/PublicImageBackground.vue'
 import { cn } from '@/lib/utils'
 
 const route = useRoute()
@@ -19,7 +20,7 @@ const router = useRouter()
 const mode = ref('invite')
 const code = ref('')
 const username = ref('admin')
-const password = ref('')
+const password = ref('admin')
 const loading = ref(false)
 const error = ref('')
 
@@ -83,22 +84,23 @@ async function submitAdmin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background px-4">
-    <Card class="w-full max-w-sm border-border shadow-lg">
+  <PublicImageBackground>
+    <div class="min-h-screen flex items-center justify-center px-4">
+      <Card class="w-full max-w-sm border-violet-400/15 bg-slate-950/75 text-slate-100 shadow-2xl shadow-indigo-950/50 backdrop-blur-md">
       <CardHeader>
-        <CardTitle class="text-lg">ComfyUI 控制台</CardTitle>
-        <CardDescription>邀请码或管理员账号登录；关闭浏览器后需重新登录。</CardDescription>
+        <CardTitle class="text-lg text-slate-50">ComfyUI 控制台</CardTitle>
+        <CardDescription class="text-slate-400">邀请码或管理员账号登录；关闭浏览器后需重新登录。</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
-        <div class="grid grid-cols-2 rounded-lg border border-border p-0.5 text-sm">
+        <div class="grid grid-cols-2 rounded-lg border border-violet-400/20 bg-slate-900/40 p-0.5 text-sm">
           <button
             type="button"
             :class="
               cn(
                 'rounded-md py-1.5 transition-colors',
                 mode === 'invite'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground',
+                  ? 'bg-violet-600 text-white shadow-sm shadow-violet-900/40'
+                  : 'text-slate-400 hover:text-slate-200',
               )
             "
             @click="mode = 'invite'"
@@ -111,8 +113,8 @@ async function submitAdmin() {
               cn(
                 'rounded-md py-1.5 transition-colors',
                 mode === 'admin'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground',
+                  ? 'bg-violet-600 text-white shadow-sm shadow-violet-900/40'
+                  : 'text-slate-400 hover:text-slate-200',
               )
             "
             @click="mode = 'admin'"
@@ -133,7 +135,7 @@ async function submitAdmin() {
               :disabled="loading"
             />
           </div>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-[11px] text-slate-500">
             每次登录仅可单张生成，张数由管理员配置；无法使用批量与任务计划。
           </p>
           <Button type="submit" class="w-full" :disabled="loading">
@@ -156,7 +158,7 @@ async function submitAdmin() {
               :disabled="loading"
             />
           </div>
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-[11px] text-slate-500">
             管理员可无限次登录，并可管理邀请码、执行删除操作。
           </p>
           <Button type="submit" class="w-full" :disabled="loading">
@@ -167,5 +169,6 @@ async function submitAdmin() {
         <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
       </CardContent>
     </Card>
-  </div>
+    </div>
+  </PublicImageBackground>
 </template>

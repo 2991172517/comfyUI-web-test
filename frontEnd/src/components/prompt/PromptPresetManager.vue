@@ -2,7 +2,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
-import { useDebouncedSave } from '@/composables/useDebouncedSave.js'
+import { PROMPT_AUTO_SAVE_DEBOUNCE_MS, useDebouncedSave } from '@/composables/useDebouncedSave.js'
 import Card from '@/components/ui/Card.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import CardTitle from '@/components/ui/CardTitle.vue'
@@ -68,7 +68,9 @@ async function persistPreset() {
   }
 }
 
-const { saving, markReady, schedule } = useDebouncedSave(persistPreset, { delay: 500 })
+const { saving, pending, markReady, schedule, flush } = useDebouncedSave(persistPreset, {
+  delay: PROMPT_AUTO_SAVE_DEBOUNCE_MS,
+})
 
 async function selectPreset(p) {
   suppressSave.value = true
@@ -139,6 +141,8 @@ onMounted(async () => {
     app.setMessage(e.message, true)
   }
 })
+
+defineExpose({ flush })
 </script>
 
 <template>
@@ -150,8 +154,9 @@ onMounted(async () => {
       </CardDescription>
     </CardHeader>
     <p v-else class="text-xs text-muted-foreground">
-      点击左侧预设编辑；修改后自动保存。
-      <span v-if="saving" class="text-primary">保存中…</span>
+      点击左侧预设编辑；修改后自动保存（约 {{ PROMPT_AUTO_SAVE_DEBOUNCE_MS / 1000 }} 秒防抖）。
+      <span v-if="pending && !saving" class="text-muted-foreground">待保存…</span>
+      <span v-else-if="saving" class="text-primary">保存中…</span>
     </p>
 
     <component :is="embedded ? 'div' : CardContent">

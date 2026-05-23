@@ -1,0 +1,196 @@
+body {
+  width: 100vw;
+  height: 100lvh;
+
+  background: #141414;
+
+  overflow: hidden;
+}
+
+webby-nominee {
+  --badge-size: min(30vw, 20rem);
+
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+
+  &:before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+
+    display: block;
+    width: 150%;
+    height: 140%;
+
+    background: radial-gradient(ellipse at 50% 55%, transparent 10%, black 50%);
+    transform: translate3d(-50%, -50%, 0);
+
+    content: "";
+  }
+
+  &:after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 5;
+
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    background: radial-gradient(
+      ellipse at 50% 75%,
+      #f40c3f 20%,
+      transparent 75%
+    );
+    mix-blend-mode: overlay;
+    transform: translate3d(-50%, -50%, 0);
+
+    content: "";
+  }
+
+  a {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    &:hover {
+      img {
+        transform: translate3d(0, -100%, 0) rotate(45deg);
+      }
+
+      .badge__vote {
+        transform: translate3d(0, 0, 0) rotate(0);
+      }
+    }
+  }
+  
+  .badge {
+    position: absolute;
+    top: calc(50% - var(--badge-size) * 0.5);
+    left: calc(50% - var(--badge-size) * 0.5);
+    z-index: 10;
+
+    width: var(--badge-size);
+    height: var(--badge-size);
+
+    background: #000c;
+    border-radius: 999rem;
+    overflow: hidden;
+
+    img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+
+      display: block;
+      width: 100%;
+      height: 100%;
+      
+      transition: transform 1s cubic-bezier(0.87, 0, 0.13, 1);
+    }
+
+    &__vote {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+
+      color: #f40c3f;
+      font: 700 40px / 1 "Chivo Mono", monospace;
+      text-transform: uppercase;
+
+      transform: translate3d(0, 75%, 0) rotate(45deg);
+      transition: transform 1s cubic-bezier(0.83, 0, 0.17, 1);
+    }
+  }
+
+  @keyframes aura-glow {
+    0% {
+      background-position: 0 100%;
+    }
+    100% {
+      background-position: 0 300%;
+    }
+  }
+
+  .aura {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 3;
+
+    width: calc(var(--badge-size) * 1.25);
+    height: calc(var(--badge-size) * 1.25);
+
+    background: linear-gradient(
+        20deg,
+        #00f8f1,
+        #ffbd1e20 16.5%,
+        #fe848f 33%,
+        #fe848f20 49.5%,
+        #00f8f1 66%,
+        #00f8f160 85.5%,
+        #ffbd1e 100%
+      )
+      0 100% / 100% 200%;
+    border-radius: 0 0 100% 100%;
+    filter: blur(50px);
+    mix-blend-mode: plus-lighter;
+    opacity: 0.75;
+    transform: translate3d(-50%, -50%, 0);
+
+    animation: aura-glow 5s infinite linear;
+
+    pointer-events: none;
+  }
+
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+
+    width: 100%;
+    height: 100%;
+
+    background: repeating-linear-gradient(
+      transparent,
+      transparent 1px,
+      white 1px,
+      white 2px
+    );
+    mix-blend-mode: overlay;
+    opacity: 0.5;
+
+    pointer-events: none;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
