@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
-import { ChevronDown, LogOut, User } from 'lucide-vue-next'
+import { ChevronDown, LogOut, Settings2, User } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import {
   authInviteCode,
@@ -47,6 +47,11 @@ const roleHint = computed(() => {
 
 function toggle() {
   open.value = !open.value
+}
+
+function openMagnifierSettings() {
+  open.value = false
+  router.push('/settings/magnifier')
 }
 
 async function logout() {
@@ -97,6 +102,15 @@ async function logout() {
         <p class="mt-0.5 text-[11px] text-muted-foreground">{{ roleHint }}</p>
       </div>
       <div class="p-1">
+        <button
+          type="button"
+          role="menuitem"
+          class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+          @click="openMagnifierSettings"
+        >
+          <Settings2 class="h-4 w-4 shrink-0 text-muted-foreground" />
+          全局配置
+        </button>
         <button
           type="button"
           role="menuitem"

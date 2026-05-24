@@ -17,7 +17,8 @@ config/
   prompt_defaults.json     # 全局默认正/负提示追加
 ```
 
-> **启动命令详见 [START.md](./START.md)**
+> **启动命令详见 [START.md](./START.md)**  
+> **分发给他人（闭源 exe）**：见 **[docs/打包指南.md](./docs/打包指南.md)**；客户使用见 [docs/使用说明.md](./docs/使用说明.md)
 
 ## 拉取后如何启动（速览）
 

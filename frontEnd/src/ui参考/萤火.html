@@ -1,0 +1,797 @@
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>作者：ai超级个人</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>个人作品集</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
+
+      :root {
+        /* 默认主题变量 (01: 前端 - Cyan) */
+        --bg: #050505;
+        --text-primary: #ffffff;
+        --text-secondary: #8e8e93;
+        --bar-active: #00ffcc;
+        --bar-inactive: #333333;
+        --pad: 24px;
+        --tag-border: #00ffcc;
+        --tag-text: #00ffcc;
+        --font-main: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+        --text-transform: none;
+        --letter-spacing: -0.01em;
+        --hero-color: #ffffff;
+      }
+
+      body.theme-1 {
+        /* 02: 设计 - 紫色主题 */
+        --bar-active: #cc66ff;
+        --tag-border: #cc66ff;
+        --tag-text: #cc66ff;
+      }
+
+      body.theme-2 {
+        /* 03: 后端 - 矩阵/绿色主题 */
+        --text-primary: #00ff66;
+        --text-secondary: #00cc55;
+        --bar-active: #00ff66;
+        --bar-inactive: rgba(0, 255, 102, 0.2);
+        --tag-border: #00ff66;
+        --tag-text: #00ff66;
+        --font-main: "Courier New", Courier, monospace;
+        --text-transform: uppercase;
+        --letter-spacing: 0.5px;
+        --hero-color: #00ff66;
+      }
+
+      body.theme-3 {
+        /* 04: 互动 - 深海/蓝色主题 */
+        --bar-active: #0099ff;
+        --tag-border: #0099ff;
+        --tag-text: #0099ff;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        background-color: var(--bg);
+        color: var(--text-primary);
+        font-family: var(--font-main);
+        text-transform: var(--text-transform);
+        letter-spacing: var(--letter-spacing);
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        transition:
+          color 0.3s,
+          font-family 0.3s;
+      }
+
+      #ecosystem-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+
+      .glass-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        background: radial-gradient(
+          circle at 50% 50%,
+          transparent 40%,
+          rgba(0, 0, 0, 0.8) 100%
+        );
+        pointer-events: none;
+      }
+
+      body.theme-2 .glass-overlay {
+        background:
+          radial-gradient(
+            circle at 50% 50%,
+            transparent 40%,
+            rgba(0, 0, 0, 0.8) 100%
+          ),
+          repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 255, 102, 0.03) 2px,
+            rgba(0, 255, 102, 0.03) 4px
+          );
+      }
+
+      .ui-container {
+        position: relative;
+        z-index: 10;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: var(--pad);
+      }
+
+      .hud-corners {
+        display: none;
+        position: absolute;
+        inset: 16px;
+        pointer-events: none;
+        z-index: 5;
+      }
+      body.theme-2 .hud-corners {
+        display: block;
+      }
+      .hud-corners::before,
+      .hud-corners::after,
+      .hud-corners div::before,
+      .hud-corners div::after {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--tag-border);
+        opacity: 0.5;
+      }
+      .hud-corners::before {
+        top: 0;
+        left: 0;
+        border-right: none;
+        border-bottom: none;
+      }
+      .hud-corners::after {
+        top: 0;
+        right: 0;
+        border-left: none;
+        border-bottom: none;
+      }
+      .hud-corners div::before {
+        bottom: 0;
+        left: 0;
+        border-right: none;
+        border-top: none;
+      }
+      .hud-corners div::after {
+        bottom: 0;
+        right: 0;
+        border-left: none;
+        border-top: none;
+      }
+
+      header {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .top-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 8px;
+      }
+
+      .title {
+        font-size: 17px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        transition: color 0.3s;
+      }
+
+      body.theme-2 .title {
+        color: var(--text-primary);
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      /* 新增的4个分类导航按钮 */
+      .nav-btn {
+        background: transparent;
+        border: 1px solid var(--bar-inactive);
+        color: var(--text-secondary);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-family: var(--font-main);
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .nav-btn:hover {
+        border-color: rgba(255, 255, 255, 0.5);
+        color: #fff;
+      }
+
+      .nav-btn.active {
+        border-color: var(--bar-active);
+        background: var(--bar-active);
+        color: var(--bg);
+      }
+
+      body.theme-2 .nav-btn.active {
+        box-shadow: 0 0 10px var(--bar-active);
+      }
+
+      .hero-data {
+        margin-top: 24px;
+        display: flex;
+        align-items: baseline;
+        color: var(--hero-color);
+      }
+
+      .hero-value {
+        font-size: clamp(80px, 22vw, 120px);
+        font-weight: 500;
+        letter-spacing: -0.05em;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hero-unit {
+        font-size: clamp(24px, 6vw, 36px);
+        font-weight: 500;
+        letter-spacing: -0.03em;
+        margin-left: 8px;
+      }
+
+      .tag-container {
+        margin-top: 12px;
+      }
+
+      .status-tag {
+        display: inline-block;
+        border: 1px solid var(--tag-border);
+        color: var(--tag-text);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        transition:
+          border-color 0.3s,
+          color 0.3s;
+      }
+
+      footer {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        margin-bottom: 8px;
+      }
+
+      .status-text {
+        font-size: clamp(18px, 5vw, 24px);
+        font-weight: 500;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+        max-width: 90%;
+        color: var(--text-secondary);
+      }
+
+      .status-text strong {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .controls {
+        display: flex;
+        gap: 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 24px;
+      }
+      body.theme-2 .controls {
+        border-top-color: rgba(0, 255, 102, 0.2);
+      }
+
+      .control-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        cursor: pointer;
+        opacity: 0.6;
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+      }
+
+      .control-item:hover,
+      .control-item.active {
+        opacity: 1;
+        transform: translateY(-2px);
+        color: var(--bar-active);
+      }
+
+      .control-item svg {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .control-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .extra-stats {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        font-weight: 600;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 12px;
+        letter-spacing: 1px;
+        color: var(--text-secondary);
+      }
+      body.theme-2 .extra-stats {
+        border-top-color: rgba(0, 255, 102, 0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="ecosystem-canvas"></canvas>
+    <div class="glass-overlay"></div>
+
+    <div class="ui-container">
+      <div class="hud-corners"><div></div></div>
+
+      <header>
+        <div class="top-nav">
+          <div class="title" id="ui-title">01 — 前端开发</div>
+
+          <!-- 4个独立的分类切换按钮 -->
+          <div class="actions">
+            <button class="nav-btn active" onclick="setTheme(0)">01</button>
+            <button class="nav-btn" onclick="setTheme(1)">02</button>
+            <button class="nav-btn" onclick="setTheme(2)">03</button>
+            <button class="nav-btn" onclick="setTheme(3)">04</button>
+          </div>
+        </div>
+
+        <div class="hero-data">
+          <div class="hero-value" id="hero-value">99</div>
+          <div class="hero-unit" id="hero-unit">%</div>
+        </div>
+        <div class="tag-container">
+          <span class="status-tag" id="status-tag">网页工程</span>
+        </div>
+      </header>
+
+      <footer>
+        <div class="status-text" id="status-desc">
+          打造<strong>响应式</strong>、<br />
+          高性能<br />
+          用户界面。
+        </div>
+
+        <div class="controls">
+          <!-- 作品集相关底部菜单 -->
+          <div class="control-item">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+              ></path>
+            </svg>
+            <span class="control-label">作品</span>
+          </div>
+          <div class="control-item">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              ></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span class="control-label">简历</span>
+          </div>
+          <div class="control-item">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+              ></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            <span class="control-label">联系</span>
+          </div>
+        </div>
+
+        <div class="extra-stats" id="extra-stats">
+          <span>经验：5+ 年</span>
+          <span>地点：远程工作</span>
+          <span>状态：开放招聘</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("ecosystem-canvas");
+      const ctx = canvas.getContext("2d");
+
+      let width, height;
+      let tendrils = [];
+      let particles = [];
+
+      // 核心配置：定义 4 种视觉与文案风格
+      const themes = [
+        {
+          id: 0,
+          title: "01 — 前端开发",
+          value: "99",
+          unit: "%",
+          tag: "网页工程",
+          desc: "打造<strong>响应式</strong>、<br/>高性能<br/>用户界面。",
+          colors: [
+            "rgba(0, 255, 204, ",
+            "rgba(0, 153, 255, ",
+            "rgba(0, 200, 150, ",
+          ],
+          particleType: "spore",
+          tendrilStyle: "thin",
+          drawDome: false,
+          wind: 0,
+        },
+        {
+          id: 1,
+          title: "02 — 视觉设计",
+          value: "120",
+          unit: "PX",
+          tag: "UI / UX 设计",
+          desc: "精心打磨<strong>像素级</strong>、<br/>美观且<br/>直观的体验。",
+          colors: [
+            "rgba(204, 102, 255, ",
+            "rgba(255, 102, 153, ",
+            "rgba(153, 51, 255, ",
+          ],
+          particleType: "spore",
+          tendrilStyle: "thin",
+          drawDome: true,
+          wind: 0,
+        },
+        {
+          id: 2,
+          title: "03 — 系统架构",
+          value: "10",
+          unit: "K+",
+          tag: "后端逻辑",
+          desc: "设计<strong>稳定</strong>、<br/>可扩展且安全<br/>的服务环境。",
+          colors: [
+            "rgba(0, 255, 102, ",
+            "rgba(50, 255, 150, ",
+            "rgba(0, 200, 80, ",
+          ],
+          particleType: "sparks",
+          tendrilStyle: "straight",
+          drawDome: false,
+          wind: 150,
+        },
+        {
+          id: 3,
+          title: "04 — 创意编程",
+          value: "60",
+          unit: "FPS",
+          tag: "交互艺术",
+          desc: "融合<strong>代码与艺术</strong>。<br/>流畅动画<br/>与 WebGL & Canvas。",
+          colors: [
+            "rgba(0, 153, 255, ",
+            "rgba(51, 204, 255, ",
+            "rgba(0, 102, 204, ",
+          ],
+          particleType: "bubble",
+          tendrilStyle: "thick",
+          drawDome: false,
+          wind: 0,
+        },
+      ];
+
+      let currentThemeIdx = 0;
+      let currentTheme = themes[0];
+
+      // 指定切换到某个主题
+      function setTheme(idx) {
+        currentThemeIdx = idx;
+        currentTheme = themes[idx];
+
+        // 切换 CSS Class 改变全站颜色配方
+        document.body.className = idx !== 0 ? `theme-${idx}` : "";
+
+        // 更新按钮状态
+        const buttons = document.querySelectorAll(".nav-btn");
+        buttons.forEach((btn, i) => {
+          btn.className = `nav-btn ${i === idx ? "active" : ""}`;
+        });
+
+        // 同步文案
+        document.getElementById("ui-title").innerText = currentTheme.title;
+        document.getElementById("hero-value").innerText = currentTheme.value;
+        document.getElementById("hero-unit").innerText = currentTheme.unit;
+        document.getElementById("status-tag").innerText = currentTheme.tag;
+        document.getElementById("status-desc").innerHTML = currentTheme.desc;
+
+        // 重绘画布以应用新特效
+        initEcosystem();
+      }
+
+      function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        initEcosystem();
+      }
+
+      class Tendril {
+        constructor() {
+          this.x = Math.random() * width;
+          this.baseX = this.x;
+          this.segments =
+            currentTheme.tendrilStyle === "straight"
+              ? 3
+              : Math.floor(Math.random() * 5) + 5;
+          this.length = Math.random() * height * 0.4 + height * 0.2;
+          this.segmentLength = this.length / this.segments;
+          this.swaySpeed =
+            currentTheme.tendrilStyle === "straight"
+              ? Math.random() * 0.005 + 0.002
+              : Math.random() * 0.002 + 0.001;
+          this.offset = Math.random() * Math.PI * 2;
+          this.color =
+            currentTheme.colors[
+              Math.floor(Math.random() * currentTheme.colors.length)
+            ];
+          this.alpha = Math.random() * 0.3 + 0.1;
+          this.thickness =
+            currentTheme.tendrilStyle === "thick"
+              ? Math.random() * 3 + 1.5
+              : Math.random() * 1 + 1;
+        }
+
+        draw(time) {
+          ctx.beginPath();
+          ctx.moveTo(this.baseX, height);
+
+          let currentX = this.baseX;
+          let currentY = height;
+
+          for (let i = 1; i <= this.segments; i++) {
+            let sway =
+              Math.sin(time * this.swaySpeed + this.offset + i * 0.5) * (i * 5);
+            let windEffect = (i / this.segments) * currentTheme.wind;
+            let targetX = this.baseX + sway + windEffect;
+            let targetY = height - i * this.segmentLength;
+
+            ctx.quadraticCurveTo(currentX, currentY, targetX, targetY);
+
+            currentX = targetX;
+            currentY = targetY;
+          }
+
+          if (currentTheme.tendrilStyle === "thick") {
+            ctx.lineCap = "round";
+            ctx.strokeStyle = `${this.color}${this.alpha * 0.5})`;
+            ctx.lineWidth = this.thickness * 2.5;
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = `${this.color}${this.alpha})`;
+          ctx.lineWidth = this.thickness;
+          ctx.stroke();
+
+          if (currentTheme.tendrilStyle !== "straight") {
+            ctx.beginPath();
+            ctx.arc(
+              currentX,
+              currentY,
+              this.thickness * 1.5 + 1,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fillStyle = `${this.color}${this.alpha + 0.5})`;
+            ctx.fill();
+          }
+        }
+      }
+
+      class Particle {
+        constructor() {
+          this.reset(true);
+        }
+
+        reset(randomY = false) {
+          this.x = Math.random() * width;
+          this.size = Math.random() * 2 + 0.5;
+
+          if (currentTheme.particleType === "bubble") {
+            this.size = Math.random() * 4 + 2;
+            this.y = randomY ? Math.random() * height : height + 50;
+            this.speedY = Math.random() * 1 + 0.5;
+            this.speedX = (Math.random() - 0.5) * 0.5;
+          } else if (currentTheme.particleType === "sparks") {
+            this.y = randomY ? Math.random() * height : height + 50;
+            this.speedY = Math.random() * -3 - 2;
+            this.speedX = Math.random() * 3 + 2;
+          } else {
+            this.y = randomY ? Math.random() * height : -50;
+            this.speedY = Math.random() * 0.5 + 0.1;
+            this.speedX = (Math.random() - 0.5) * 0.5;
+          }
+
+          this.color =
+            currentTheme.colors[
+              Math.floor(Math.random() * currentTheme.colors.length)
+            ];
+          this.alpha = Math.random() * 0.8;
+          this.pulseSpeed = Math.random() * 0.05 + 0.01;
+        }
+
+        draw(time) {
+          this.y +=
+            currentTheme.particleType === "bubble" ? -this.speedY : this.speedY;
+
+          if (currentTheme.particleType === "bubble") {
+            this.x += Math.sin(time * 0.001 + this.y * 0.01) * 0.5;
+          } else if (currentTheme.particleType === "sparks") {
+            this.x += this.speedX;
+          } else {
+            this.x +=
+              this.speedX + Math.sin(time * 0.001 + this.y * 0.01) * 0.2;
+          }
+
+          if (
+            (currentTheme.particleType === "bubble" ||
+              currentTheme.particleType === "sparks") &&
+            this.y < -50
+          )
+            this.reset();
+          else if (
+            currentTheme.particleType === "spore" &&
+            this.y > height + 50
+          )
+            this.reset();
+
+          if (this.x < -50) this.x = width + 50;
+          if (this.x > width + 50) this.x = -50;
+
+          let currentAlpha =
+            this.alpha + Math.sin(time * this.pulseSpeed) * 0.2;
+          currentAlpha = Math.max(0, Math.min(1, currentAlpha));
+
+          if (currentTheme.particleType === "bubble") {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.strokeStyle = `${this.color}${currentAlpha + 0.2})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(
+              this.x - this.size * 0.3,
+              this.y - this.size * 0.3,
+              this.size * 0.2,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha * 0.6})`;
+            ctx.fill();
+          } else if (currentTheme.particleType === "sparks") {
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x - this.speedX * 2, this.y - this.speedY * 2);
+            ctx.strokeStyle = `${this.color}${currentAlpha})`;
+            ctx.lineWidth = this.size > 1 ? 2 : 1;
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = `${this.color}${currentAlpha})`;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = `${this.color}1)`;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+
+      function drawDome() {
+        if (!currentTheme.drawDome) return;
+        let cx = width / 2,
+          cy = height,
+          r = Math.min(width, height) * 0.5;
+        let grad = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r);
+        grad.addColorStop(0, "rgba(255, 100, 200, 0.15)");
+        grad.addColorStop(0.5, "rgba(150, 50, 255, 0.05)");
+        grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, Math.PI, 0);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      function drawWaterRipples(time) {
+        if (currentTheme.id !== 3) return;
+        ctx.fillStyle = "rgba(0, 20, 50, 0.5)";
+        ctx.fillRect(0, height - 25, width, 25);
+        let grad = ctx.createLinearGradient(0, height - 25, 0, height);
+        grad.addColorStop(0, "rgba(0, 150, 255, 0.3)");
+        grad.addColorStop(1, "rgba(0, 50, 150, 0.8)");
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 20) {
+          let y = height - 25 + Math.sin(time * 0.002 + x * 0.02) * 6;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      function initEcosystem() {
+        tendrils = [];
+        particles = [];
+        const numTendrils = Math.floor(width / 30);
+        const numParticles = Math.floor(width / 10);
+        for (let i = 0; i < numTendrils; i++) tendrils.push(new Tendril());
+        for (let i = 0; i < numParticles; i++) particles.push(new Particle());
+      }
+
+      function animate(time) {
+        if (currentTheme.id === 3) ctx.fillStyle = "rgba(2, 10, 25, 0.2)";
+        else if (currentTheme.id === 2) ctx.fillStyle = "rgba(0, 10, 0, 0.2)";
+        else ctx.fillStyle = "rgba(5, 5, 5, 0.2)";
+        ctx.fillRect(0, 0, width, height);
+
+        drawDome();
+        drawWaterRipples(time);
+
+        tendrils.forEach((t) => t.draw(time));
+        particles.forEach((p) => p.draw(time));
+
+        if (currentTheme.id !== 3 && Math.random() > 0.95) {
+          ctx.beginPath();
+          let rx = Math.random() * width;
+          ctx.moveTo(rx, Math.random() * height);
+          ctx.lineTo(rx, height);
+          ctx.strokeStyle = `rgba(255,255,255,${currentTheme.id === 2 ? 0.08 : 0.03})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      window.addEventListener("resize", resize);
+      resize();
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>

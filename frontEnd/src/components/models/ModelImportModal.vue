@@ -1,10 +1,16 @@
 <script setup>
+import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import ModelImportPanel from '@/components/models/ModelImportPanel.vue'
 import { useModelImportModal } from '@/composables/useModelImportModal.js'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 
 const { open, close, initialUrl } = useModelImportModal()
+const backdropRef = ref(null)
+const panelRef = ref(null)
+
+useModalMotion(open, backdropRef, panelRef)
 
 function onBackdrop(e) {
   if (e.target === e.currentTarget) close()
@@ -15,10 +21,12 @@ function onBackdrop(e) {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm"
       @click="onBackdrop"
     >
       <div
+        ref="panelRef"
         class="flex max-h-[min(92vh,860px)] w-full max-w-4xl flex-col overflow-hidden rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
         role="dialog"
         aria-modal="true"

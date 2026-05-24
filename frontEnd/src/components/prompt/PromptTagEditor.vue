@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { collapseOut, popIn } from '@/lib/gsap/motion.js'
 import { api } from '@/api/client.js'
 import { cn } from '@/lib/utils'
 import { splitPromptTokens } from '@/lib/promptDisplay.js'
@@ -37,6 +38,8 @@ const model = defineModel({ type: String, default: '' })
 const props = defineProps({
   disabled: { type: Boolean, default: false },
   class: { type: String, default: '' },
+  /** positive | negative — 用于生成吸入动画区分栏位 */
+  promptSide: { type: String, default: '' },
 })
 
 const tags = ref([])
@@ -416,7 +419,12 @@ async function commitTag(rawValue) {
   resolving.value = true
   try {
     const tag = await buildTag(v)
-    if (tag) tags.value.push(tag)
+    if (tag) {
+      tags.value.push(tag)
+      await nextTick()
+      const chip = editorRootRef.value?.querySelector(`[data-tag-id="${tag.id}"]`)
+      if (chip) popIn(chip)
+    }
     draft.value = ''
     acClose()
     flushEmitUpdate()
@@ -489,6 +497,13 @@ watch(tags, () => emitUpdate(), { deep: true })
 function removeTag(id) {
   pushUndo()
   if (activeTagId.value === id) activeTagId.value = null
+  const chip = editorRootRef.value?.querySelector(`[data-tag-id="${id}"]`)
+  if (chip) {
+    collapseOut(chip).then(() => {
+      tags.value = tags.value.filter((t) => t.id !== id)
+    })
+    return
+  }
   tags.value = tags.value.filter((t) => t.id !== id)
 }
 function onInput() {
@@ -563,19 +578,23 @@ function onAutocompleteSelect(index) {
 <template>
   <div
     ref="editorRootRef"
+    data-prompt-tag-editor
+    :data-prompt-side="promptSide || undefined"
     tabindex="-1"
     :class="
       cn(
-        'flex min-h-[8.5rem] w-full flex-col rounded-md border border-input bg-background px-2 py-2 text-sm shadow-sm focus-within:ring-2 focus-within:ring-ring',
+        'flex h-full max-h-full min-h-0 w-full flex-col rounded-md border border-input bg-background px-2 py-2 text-sm shadow-sm focus-within:ring-2 focus-within:ring-ring',
         props.class,
       )
     "
   >
-    <div class="flex min-h-[5rem] flex-1 flex-wrap content-start gap-1.5 overflow-y-auto pb-2" @click="onTagsAreaClick">
+    <div class="flex min-h-[5rem] min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto overscroll-contain pb-2" @click="onTagsAreaClick">
       <div
         v-for="tag in tags"
         :key="tag.id"
         data-tag-chip
+        :data-tag-id="tag.id"
+        :data-tag-muted="tag.muted ? '' : undefined"
         class="group relative flex max-w-full min-h-[3rem] overflow-hidden rounded-md border pl-2 pr-6 transition-[box-shadow,border-color] duration-150"
         :class="[
           tagChipClass(tag),
@@ -767,7 +786,7 @@ function onAutocompleteSelect(index) {
       </p>
     </div>
 
-    <div class="relative flex items-center gap-1 border-t border-border/60 pt-2">
+    <div class="relative flex shrink-0 items-center gap-1 border-t border-border/60 pt-2">
       <input
         ref="inputRef"
         v-model="draft"

@@ -1,0 +1,41 @@
+/* 仅 tag 克隆体：保留芯片阴影 */
+.tag-absorb-flyer--chip {
+  box-shadow:
+    0 0 0 1px hsl(var(--primary) / 0.35),
+    0 8px 24px hsl(var(--primary) / 0.22);
+  filter: saturate(1.12);
+}
+
+/* 文字吸入：无描边芯片，轻幽灵字 */
+.tag-absorb-flyer--text {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: hsl(var(--foreground) / 0.92);
+  text-shadow:
+    0 0 12px hsl(var(--background) / 0.85),
+    0 1px 4px hsl(0 0% 0% / 0.45);
+  box-shadow: none;
+  filter: none;
+}
+
+.tag-absorb-flyer--text.is-global {
+  color: hsl(38 85% 42%);
+}
+
+.tag-absorb-flyer--text.is-random {
+  color: hsl(152 55% 36%);
+}
+
+.tag-absorb-flyer--text.is-core {
+  color: hsl(var(--foreground) / 0.88);
+}

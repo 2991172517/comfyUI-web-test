@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-import { watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
+import { staggerReveal } from '@/lib/gsap/motion.js'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { buildSingleFavoritePayload } from '@/utils/favoritePayload.js'
@@ -14,11 +14,33 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
+import Progress from '@/components/ui/Progress.vue'
 import { isAdmin } from '@/composables/useAuth.js'
+import { useGenerateStageLog } from '@/composables/useGenerateStageLog.js'
 
 const store = useAppStore()
 const history = useHistoryStore()
+const { prepActive, stageLogs } = useGenerateStageLog()
 const imageLightboxRef = ref(null)
+const resultsGridRef = ref(null)
+let lastImageCount = 0
+
+watch(
+  () => store.job.images.length,
+  async (n) => {
+    if (n <= lastImageCount) {
+      lastImageCount = n
+      return
+    }
+    lastImageCount = n
+    await nextTick()
+    const grid = resultsGridRef.value
+    if (!grid) return
+    const figures = grid.querySelectorAll('[data-stagger-item]')
+    if (figures.length) staggerReveal(figures)
+  },
+)
 const { refreshFavorites } = useFavorites()
 const { saveOne, saveAll } = useImageDownload()
 
@@ -54,13 +76,18 @@ function downloadAllImages() {
   saveAll(store.job.images)
 }
 
-async function onFavoriteToggled() {
-  await refreshFavorites()
+async function deleteJobOutputs() {
+  const ok = await store.deleteOutputs()
+  if (ok) await history.refresh()
 }
 </script>
 
 <template>
-  <Card v-if="store.job.status !== 'idle'" class="mb-6">
+  <Card
+    v-if="store.job.status !== 'idle' || prepActive"
+    data-generate-status="single"
+    class="mb-6 scroll-mt-20"
+  >
     <CardHeader class="flex flex-row flex-wrap items-center gap-3 space-y-0 pb-2">
       <CardTitle class="text-base">生成状态</CardTitle>
       <Button
@@ -85,6 +112,23 @@ async function onFavoriteToggled() {
       </Badge>
     </CardHeader>
     <CardContent class="space-y-3">
+      <div
+        v-if="stageLogs.length"
+        class="rounded-md border border-border/70 bg-muted/25 px-3 py-2.5"
+      >
+        <p class="mb-2 text-xs font-medium text-muted-foreground">准备日志</p>
+        <ul class="max-h-36 space-y-1 overflow-y-auto">
+          <li
+            v-for="line in stageLogs"
+            :key="line.id"
+            class="flex gap-2 text-xs leading-relaxed"
+          >
+            <span class="shrink-0 tabular-nums text-muted-foreground">{{ line.time }}</span>
+            <span class="text-foreground">{{ line.text }}</span>
+          </li>
+        </ul>
+      </div>
+
       <p v-if="store.job.promptId" class="text-sm text-muted-foreground">
         任务 ID: {{ store.job.promptId }}
       </p>
@@ -95,13 +139,10 @@ async function onFavoriteToggled() {
 
       <div
         v-if="store.progressPercent != null && store.isGenerating"
-        class="relative h-2 overflow-hidden rounded-full bg-secondary"
+        class="relative space-y-1"
       >
-        <div
-          class="h-full bg-primary transition-all duration-300"
-          :style="{ width: store.progressPercent + '%' }"
-        />
-        <span class="absolute right-0 -top-5 text-xs text-muted-foreground">
+        <Progress :value="store.progressPercent" />
+        <span class="block text-right text-xs text-muted-foreground tabular-nums">
           {{ store.progressPercent }}%
         </span>
       </div>
@@ -121,33 +162,40 @@ async function onFavoriteToggled() {
               v-if="isAdmin()"
               variant="destructive"
               size="sm"
-              @click="store.deleteOutputs"
+              @click="deleteJobOutputs"
             >
               删除服务器图片
             </Button>
           </div>
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div
+          ref="resultsGridRef"
+          class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+        >
           <figure
             v-for="(img, idx) in store.job.images"
             :key="img.id"
-            class="overflow-hidden rounded-lg border border-border bg-background"
+            data-stagger-item
+            class="overflow-visible rounded-lg border border-border bg-background"
           >
-            <div class="relative">
-              <FavoriteStar
-                :payload="singleFavoritePayload(img)"
-                size="small"
-                class="absolute right-2 top-2 z-10"
-                @toggled="onFavoriteToggled"
-              />
-              <img
-                :src="img.url"
-                :alt="img.filename"
-                loading="lazy"
-                class="aspect-square w-full cursor-zoom-in object-contain bg-black/40 hover:opacity-90"
-                title="点击查看大图"
-                @click="openJobImagePreview(idx)"
-              />
+            <div class="overflow-hidden rounded-t-lg">
+              <div class="relative aspect-square w-full bg-muted/30">
+                <ImageMagnifierPreview
+                  fill
+                  :src="img.url"
+                  :alt="img.filename"
+                  @click="openJobImagePreview(idx)"
+                >
+                  <template #overlay>
+                    <FavoriteStar
+                      :payload="singleFavoritePayload(img)"
+                      size="small"
+                      class="absolute right-2 top-2 z-10"
+                      @toggled="onFavoriteToggled"
+                    />
+                  </template>
+                </ImageMagnifierPreview>
+              </div>
             </div>
             <figcaption class="flex items-center justify-between gap-2 p-2 text-xs">
               <span class="truncate text-muted-foreground" :title="img.filename">{{

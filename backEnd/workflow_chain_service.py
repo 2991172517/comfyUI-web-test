@@ -71,7 +71,7 @@ def _rebuild_clip_routing(prompt: dict, meta: dict) -> None:
     slots = _lora_slots(meta)
     style_slot = next((s for s in slots if s.get("role") == "style"), None)
     char_slots = [s for s in slots if s.get("role") != "style"]
-    last_char = char_slots[-1]["node_id"] if char_slots else None
+    last_char = str(char_slots[-1]["node_id"]) if char_slots else None
     ckpt, clip = _checkpoint_and_clip(meta)
 
     pos = topo.get("positive_encode") or {}
@@ -87,33 +87,80 @@ def _rebuild_clip_routing(prompt: dict, meta: dict) -> None:
         prompt[pos_nid].setdefault("inputs", {})["clip"] = [clip, 0]
 
     if style_slot and neg_nid in prompt:
-        topo["negative_encode"] = {**neg, "clip_source_node": style_slot["node_id"]}
-        prompt[neg_nid].setdefault("inputs", {})["clip"] = [style_slot["node_id"], 1]
+        sid = str(style_slot["node_id"])
+        topo["negative_encode"] = {**neg, "clip_source_node": sid}
+        prompt[neg_nid].setdefault("inputs", {})["clip"] = [sid, 1]
     elif last_char and neg_nid in prompt:
         topo["negative_encode"] = {**neg, "clip_source_node": last_char}
         prompt[neg_nid].setdefault("inputs", {})["clip"] = [last_char, 1]
+    elif neg_nid in prompt:
+        topo["negative_encode"] = {**neg, "clip_source_node": clip}
+        prompt[neg_nid].setdefault("inputs", {})["clip"] = [clip, 0]
 
     ks1 = str(topo.get("ksampler_pass1", "5"))
     ks2 = str(topo.get("ksampler_pass2", "14"))
-    tail = style_slot["node_id"] if style_slot else (last_char or ckpt)
-    tail_out = 0 if tail == ckpt else 0
+    tail = str(style_slot["node_id"]) if style_slot else (last_char or ckpt)
     for ks in (ks1, ks2):
         if ks in prompt:
-            prompt[ks].setdefault("inputs", {})["model"] = [tail, tail_out]
+            prompt[ks].setdefault("inputs", {})["model"] = [tail, 0]
 
-    fallback = last_char or ckpt
-    fb_out_model, fb_out_clip = (0, 1 if fallback != ckpt else 0)
     if style_slot:
+        fallback = last_char or ckpt
+        fb_clip = [fallback, 1] if fallback != ckpt else [clip, 0]
         bypass = topo.setdefault("style_bypass_when_disabled", {})
-        bypass["node_id"] = style_slot["node_id"]
+        bypass["node_id"] = str(style_slot["node_id"])
         bypass["fallback_node_id"] = fallback
         bypass["rewire"] = [
-            {"target_node": neg_nid, "input_key": "clip", "source": [fallback, fb_out_clip if fallback != ckpt else 0]},
+            {
+                "target_node": neg_nid,
+                "input_key": "clip",
+                "source": [clip, 0] if fallback == ckpt else fb_clip,
+            },
             {"target_node": ks1, "input_key": "model", "source": [fallback, 0]},
             {"target_node": ks2, "input_key": "model", "source": [fallback, 0]},
         ]
-        if fallback == ckpt:
-            bypass["rewire"][0]["source"] = [clip, 0]
+    else:
+        topo.pop("style_bypass_when_disabled", None)
+
+
+def _topology_is_stale(prompt: dict, meta: dict) -> bool:
+    valid = {str(k) for k in prompt}
+    topo = meta.get("topology") or {}
+    for s in topo.get("lora_slots") or []:
+        if str(s.get("node_id", "")) not in valid:
+            return True
+    bypass = topo.get("style_bypass_when_disabled") or {}
+    for key in ("node_id", "fallback_node_id"):
+        nid = bypass.get(key)
+        if nid and str(nid) not in valid:
+            return True
+    for rule in bypass.get("rewire") or []:
+        src = rule.get("source")
+        if isinstance(src, list) and src and str(src[0]) not in valid:
+            return True
+    has_style = any(s.get("role") == "style" for s in topo.get("lora_slots") or [])
+    if bypass and not has_style:
+        return True
+    return False
+
+
+def repair_stale_topology(workflow_id: str) -> bool:
+    """meta / prompt 拓扑不一致时重建连接并写回。返回是否修复。"""
+    if is_master_workflow(workflow_id):
+        return False
+    fmt, prompt = load_workflow_file(workflow_id)
+    if fmt != "api":
+        return False
+    meta = get_effective_meta(workflow_id)
+    if not _topology_is_stale(prompt, meta):
+        return False
+    valid = {str(k) for k in prompt}
+    pruned = [s for s in _lora_slots(meta) if str(s.get("node_id", "")) in valid]
+    _set_lora_slots(meta, pruned)
+    _rebuild_clip_routing(prompt, meta)
+    save_workflow_file(workflow_id, prompt)
+    save_meta(workflow_id, meta)
+    return True
 
 
 def get_workflow_essentials(workflow_id: str) -> dict:

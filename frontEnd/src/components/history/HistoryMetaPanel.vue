@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
 import Button from '@/components/ui/Button.vue'
 import { displayPromptComma } from '@/lib/promptDisplay.js'
 import { Check, Copy } from 'lucide-vue-next'
@@ -12,6 +13,8 @@ const props = defineProps({
 })
 
 const copiedSide = ref('')
+const showPosRaw = ref(false)
+const showNegRaw = ref(false)
 
 const posComma = computed(() => displayPromptComma(props.meta, 'positive'))
 const negComma = computed(() => displayPromptComma(props.meta, 'negative'))
@@ -128,27 +131,35 @@ async function copyText(text, side) {
       />
     </div>
 
-    <details
-      v-if="meta.prompt_positive && meta.prompt_positive !== posComma"
-      class="group"
-      :open="promptsOpen || undefined"
-    >
-      <summary class="cursor-pointer text-foreground/80 hover:text-foreground">正向原文（含换行）</summary>
-      <pre
-        class="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px] leading-relaxed"
-        >{{ meta.prompt_positive }}</pre
+    <div v-if="meta.prompt_positive && meta.prompt_positive !== posComma">
+      <button
+        type="button"
+        class="text-foreground/80 hover:text-foreground transition-colors"
+        @click="showPosRaw = !showPosRaw"
       >
-    </details>
-    <details
-      v-if="meta.prompt_negative && meta.prompt_negative !== negComma"
-      class="group"
-      :open="promptsOpen || undefined"
-    >
-      <summary class="cursor-pointer text-foreground/80 hover:text-foreground">负向原文（含换行）</summary>
-      <pre
-        class="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px] leading-relaxed"
-        >{{ meta.prompt_negative }}</pre
+        {{ showPosRaw ? '收起' : '展开' }}正向原文（含换行）
+      </button>
+      <AnimatedCollapse v-model="showPosRaw">
+        <pre
+          class="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px] leading-relaxed"
+          >{{ meta.prompt_positive }}</pre
+        >
+      </AnimatedCollapse>
+    </div>
+    <div v-if="meta.prompt_negative && meta.prompt_negative !== negComma">
+      <button
+        type="button"
+        class="text-foreground/80 hover:text-foreground transition-colors"
+        @click="showNegRaw = !showNegRaw"
       >
-    </details>
+        {{ showNegRaw ? '收起' : '展开' }}负向原文（含换行）
+      </button>
+      <AnimatedCollapse v-model="showNegRaw">
+        <pre
+          class="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px] leading-relaxed"
+          >{{ meta.prompt_negative }}</pre
+        >
+      </AnimatedCollapse>
+    </div>
   </div>
 </template>

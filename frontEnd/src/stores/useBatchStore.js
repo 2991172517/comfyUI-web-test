@@ -8,6 +8,7 @@ import {
   promptConfigHasContent,
   serializePromptConfig,
 } from '@/composables/usePromptConfig.js'
+import { getConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const BATCH_STORE = Symbol('batchStore')
 
@@ -354,7 +355,12 @@ export function createBatchStore(app) {
 
   async function deleteBatch() {
     if (!batch.batchId) return
-    if (!confirm('删除本批次所有输出文件与目录？')) return
+    if (
+      !(await getConfirmDialog().confirmDelete({
+        message: '删除本批次所有输出文件与目录？',
+      }))
+    )
+      return
     try {
       await api.deleteBatch(batch.batchId)
       batch.items = []

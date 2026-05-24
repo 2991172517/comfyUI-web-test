@@ -5,9 +5,9 @@ const STORAGE_KEY = 'custom_project_prompt_editor_mode'
 /** @typedef {'plain' | 'tags' | 'autocomplete'} PromptEditorMode */
 
 export const PROMPT_EDITOR_MODE_OPTIONS = [
-  { id: 'plain', label: '纯文本', desc: '不查词库、无补全' },
+  { id: 'plain', label: '纯文本', desc: '不查词库；词条后按 : 加 (tag:) 权重' },
   { id: 'tags', label: 'Tag 条', desc: '中英文标签，滚轮调权重' },
-  { id: 'autocomplete', label: '文本 + 补全', desc: '输入时下拉建议' },
+  { id: 'autocomplete', label: '文本 + 补全', desc: '输入补全；词条后按 : 加 (tag:) 权重' },
 ]
 
 /** @returns {import('vue').Ref<PromptEditorMode>} */

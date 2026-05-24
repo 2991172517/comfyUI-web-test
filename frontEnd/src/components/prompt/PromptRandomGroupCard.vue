@@ -1,5 +1,9 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ChevronDown, Dices } from 'lucide-vue-next'
+import { getRandomGachaOverlay } from '@/composables/useRandomGachaOverlay.js'
+import { simulateGachaRowsForGroups } from '@/lib/randomGachaReels.js'
+import { useAppStore } from '@/stores/useAppStore.js'
 import Input from '@/components/ui/Input.vue'
 import PoolPickWeightPanel from '@/components/prompt/PoolPickWeightPanel.vue'
 import PromptTextarea from '@/components/prompt/PromptTextarea.vue'
@@ -21,9 +25,15 @@ const props = defineProps({
   group: { type: Object, required: true },
   index: { type: Number, default: 0 },
   disabled: { type: Boolean, default: false },
+  gachaPreview: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:group', 'remove'])
+
+const app = useAppStore()
+const previewing = ref(false)
+
+const bodyOpen = ref(true)
 
 const mode = computed(() => randomGroupMode(props.group))
 const badgeText = computed(() => groupModeBadge(props.group))
@@ -110,6 +120,34 @@ function onPickModeChange(val) {
   const pick_mode = val === 'sequential' ? 'sequential' : 'random'
   update({ pick_mode })
 }
+
+const canGachaPreview = computed(
+  () =>
+    props.gachaPreview &&
+    props.group.enabled !== false &&
+    (props.group.prompts || []).some((p) => String(p).trim()),
+)
+
+async function simulateGroup() {
+  if (previewing.value || !canGachaPreview.value) return
+  previewing.value = true
+  try {
+    const rows = simulateGachaRowsForGroups([props.group])
+    if (!rows.length) {
+      app.setMessage('该组没有可抽取的词条', true)
+      return
+    }
+    await getRandomGachaOverlay().playWithRows(rows, {
+      title: '模拟抽词',
+      subtitle: `预览「${props.group.name || '随机组'}」（不影响实际生成）`,
+      manualClose: true,
+    })
+  } catch (e) {
+    app.setMessage(e.message, true)
+  } finally {
+    previewing.value = false
+  }
+}
 </script>
 
 <template>
@@ -160,6 +198,17 @@ function onPickModeChange(val) {
         {{ badgeText }}
       </Badge>
       <Button
+        v-if="gachaPreview"
+        variant="ghost"
+        size="sm"
+        class="h-8 w-8 shrink-0 p-0 text-primary"
+        :disabled="disabled || previewing || !canGachaPreview"
+        title="模拟抽取本组"
+        @click="simulateGroup"
+      >
+        <Dices class="h-4 w-4" />
+      </Button>
+      <Button
         v-if="countCandidates(group) > 1"
         variant="outline"
         size="sm"
@@ -171,13 +220,24 @@ function onPickModeChange(val) {
         合并池
       </Button>
       <IconDeleteButton
-        class="ml-auto"
+        class="shrink-0"
         :disabled="disabled"
         title="删除组"
         @click="emit('remove')"
       />
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-8 w-8 shrink-0 p-0"
+        :disabled="disabled"
+        :title="bodyOpen ? '收起词条' : '展开词条'"
+        @click="bodyOpen = !bodyOpen"
+      >
+        <ChevronDown :class="cn('h-4 w-4 transition-transform', bodyOpen && 'rotate-180')" />
+      </Button>
     </div>
 
+    <template v-if="bodyOpen">
     <p class="text-[10px] text-muted-foreground leading-snug">{{ modeHint }}</p>
 
     <template v-if="mode === 'pool'">
@@ -266,6 +326,7 @@ function onPickModeChange(val) {
           + 方案
         </Button>
       </div>
+    </template>
     </template>
   </article>
 </template>

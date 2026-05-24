@@ -4,16 +4,21 @@ import { X } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import PromptSettingsPanel from '@/components/prompt/PromptSettingsPanel.vue'
 import { useGlobalPromptModal } from '@/composables/useGlobalPromptModal.js'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 
 const { open, activeTab, close } = useGlobalPromptModal()
-const panelRef = ref(null)
+const settingsPanelRef = ref(null)
+const backdropRef = ref(null)
+const dialogRef = ref(null)
 const closing = ref(false)
+
+useModalMotion(open, backdropRef, dialogRef)
 
 async function requestClose() {
   if (closing.value) return
   closing.value = true
   try {
-    await panelRef.value?.flushPendingSaves?.()
+    await settingsPanelRef.value?.flushPendingSaves?.()
   } finally {
     closing.value = false
     close()
@@ -29,10 +34,12 @@ function onBackdrop(e) {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm"
       @click="onBackdrop"
     >
       <div
+        ref="dialogRef"
         class="flex max-h-[min(92vh,800px)] w-full max-w-4xl flex-col overflow-hidden rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
@@ -63,7 +70,7 @@ function onBackdrop(e) {
         </header>
 
         <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-          <PromptSettingsPanel ref="panelRef" v-model="activeTab" compact />
+          <PromptSettingsPanel ref="settingsPanelRef" v-model="activeTab" compact />
         </div>
       </div>
     </div>

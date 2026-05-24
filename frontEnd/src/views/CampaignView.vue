@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { staggerReveal } from '@/lib/gsap/motion.js'
 import { RouterLink, useRouter } from 'vue-router'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
@@ -22,6 +23,7 @@ import {
   workflowLabel,
 } from '@/lib/campaignTasks.js'
 import { cn } from '@/lib/utils'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 import {
   Calendar,
   History,
@@ -34,6 +36,7 @@ import {
 
 const app = useAppStore()
 const batch = useBatchStore()
+const { confirmDelete } = useConfirmDialog()
 const router = useRouter()
 const tasks = ref([])
 const selected = ref(new Set())
@@ -76,6 +79,19 @@ const statusCounts = computed(() => countByStatus(tasks.value))
 const selectedInView = computed(() =>
   filteredTasks.value.filter((t) => selected.value.has(t.task_id)).length,
 )
+
+const taskGridRef = ref(null)
+
+async function revealTasks() {
+  await nextTick()
+  const items = taskGridRef.value?.querySelectorAll('[data-stagger-item]')
+  if (items?.length) staggerReveal(items)
+}
+
+watch(() => filteredTasks.value.length, revealTasks)
+watch(loading, (v) => {
+  if (!v) revealTasks()
+})
 
 function formatTime(iso) {
   if (!iso) return ''
@@ -157,7 +173,7 @@ function clearSelectionIfIncludes(ids) {
 async function removeTask(id, ev) {
   ev?.stopPropagation?.()
   ev?.preventDefault?.()
-  if (!confirm('删除该任务？')) return
+  if (!(await confirmDelete({ message: '删除该任务？' }))) return
   try {
     await api.deleteBatchTask(id)
     clearSelectionIfIncludes([id])
@@ -174,7 +190,11 @@ async function removeSelected() {
     app.setMessage('请先勾选要删除的任务', true)
     return
   }
-  if (!confirm(`确定删除选中的 ${ids.length} 个任务？（仅删除计划配置，不删除已生成的批量图片）`)) {
+  if (
+    !(await confirmDelete({
+      message: `确定删除选中的 ${ids.length} 个任务？仅删除计划配置，不删除已生成的批量图片。`,
+    }))
+  ) {
     return
   }
   let ok = 0
@@ -232,7 +252,10 @@ function goAllHistory() {
   router.push({ path: '/history' })
 }
 
-onMounted(() => refresh())
+onMounted(async () => {
+  await refresh()
+  revealTasks()
+})
 </script>
 
 <template>
@@ -243,7 +266,7 @@ onMounted(() => refresh())
       <div>
         <p class="text-sm text-muted-foreground max-w-2xl leading-relaxed">
           在
-          <RouterLink to="/generate?mode=sweep" class="text-primary underline font-medium">
+          <RouterLink to="/generate" class="text-primary underline font-medium">
             生成 · 批量生成
           </RouterLink>
           配置后「保存为任务」，在此勾选并串行执行；完成后可查看该任务的历史批次。
@@ -364,11 +387,13 @@ onMounted(() => refresh())
       <div class="space-y-3 min-w-0">
         <div
           v-if="filteredTasks.length"
+          ref="taskGridRef"
           class="grid gap-3 sm:grid-cols-2"
         >
           <article
             v-for="t in filteredTasks"
             :key="t.task_id"
+            data-stagger-item
             :class="
               cn(
                 'group relative flex flex-col rounded-xl border bg-card overflow-hidden transition-all',
@@ -474,7 +499,7 @@ onMounted(() => refresh())
             <p class="text-sm text-muted-foreground">暂无任务</p>
             <p class="text-xs text-muted-foreground">
               在
-              <RouterLink to="/generate?mode=sweep" class="text-primary underline">生成页</RouterLink>
+              <RouterLink to="/generate" class="text-primary underline">生成页</RouterLink>
               保存扫参任务，或运行
               <code class="text-[10px]">scripts/seed_lora_batch_tasks.py</code>
             </p>

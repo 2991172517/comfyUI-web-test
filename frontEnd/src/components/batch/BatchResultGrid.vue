@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { animateBatchCellImage, resetBatchCellSeen } from '@/lib/gsap/batchCell.js'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
@@ -14,6 +15,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Label from '@/components/ui/Label.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
 import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'batch-grid-cell-size'
@@ -70,6 +72,27 @@ const sizePresets = [
 watch(cellSize, (v) => {
   localStorage.setItem(STORAGE_KEY, String(Math.round(v)))
 })
+
+watch(
+  () => batch.batch.batchId,
+  (id) => {
+    resetBatchCellSeen(id || 'default')
+  },
+)
+
+watch(
+  () =>
+    batch.batch.items
+      .map((i) => `${i.index}:${i.url || ''}`)
+      .join('|'),
+  async () => {
+    await nextTick()
+    document.querySelectorAll('[data-batch-cell]').forEach((el) => {
+      const key = el.getAttribute('data-batch-cell')
+      if (key && el.querySelector('img')) animateBatchCellImage(el, key)
+    })
+  },
+)
 
 const gridStyle = computed(() => ({
   gridTemplateColumns: `2.75rem repeat(${batch.gridCells.cols}, ${cellSize.value}px)`,
@@ -157,25 +180,31 @@ function openBatchImagePreview(cell) {
               <div
                 v-for="(cell, ib) in row"
                 :key="'c' + ia + '-' + ib"
-                class="overflow-hidden rounded-md border border-border bg-background"
+                :data-batch-cell="cell ? `c-${cell.index ?? `${ia}-${ib}`}` : undefined"
+                class="overflow-visible rounded-md border border-border bg-background"
                 :style="{ width: cellSize + 'px' }"
               >
                 <template v-if="cell && batch.cellImage(cell)">
-                  <div class="relative bg-black/40">
-                    <FavoriteStar
-                      v-if="batch.batchFavoritePayload(cell)"
-                      :payload="batch.batchFavoritePayload(cell)"
-                      size="small"
-                      class="absolute right-1 top-1 z-10"
-                      @toggled="emit('favorite-toggled', $event)"
-                    />
-                    <img
+                  <div
+                    class="relative overflow-hidden rounded-t-md bg-black/40"
+                    :style="{ height: imageHeight + 'px' }"
+                  >
+                    <ImageMagnifierPreview
+                      fill
                       :src="batch.cellImage(cell).url"
-                      loading="lazy"
-                      :style="{ height: imageHeight + 'px' }"
-                      class="w-full cursor-zoom-in object-contain hover:opacity-90"
                       @click="openBatchImagePreview(cell)"
-                    />
+                    >
+                      <template #overlay>
+                        <FavoriteStar
+                          v-if="batch.batchFavoritePayload(cell)"
+                          :payload="batch.batchFavoritePayload(cell)"
+                          size="small"
+                          class="absolute right-1 top-1 z-10"
+                          @click.stop
+                          @toggled="emit('favorite-toggled', $event)"
+                        />
+                      </template>
+                    </ImageMagnifierPreview>
                   </div>
                   <div
                     v-if="showMeta"

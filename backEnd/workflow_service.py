@@ -283,8 +283,10 @@ def build_editable_view_ui(ui_data: dict) -> list[dict]:
 
 
 def get_workflow_detail(workflow_id: str, *, style_enabled: bool | None = None) -> dict:
+    import workflow_chain_service as wcs
     import workflow_meta_service as wms
 
+    wcs.repair_stale_topology(workflow_id)
     fmt, data = load_workflow_file(workflow_id)
     if fmt != "api":
         raise ValueError("批量功能目前仅支持 API 格式工作流，请使用 Export (API) 导出。")
@@ -326,8 +328,10 @@ def build_api_prompt(
     apply_defaults: bool = True,
 ) -> dict:
     import prompt_defaults_service as pds
+    import workflow_chain_service as wcs
     import workflow_meta_service as wms
 
+    wcs.repair_stale_topology(workflow_id)
     fmt, data = load_workflow_file(workflow_id)
     object_info = get_object_info()
     if fmt == "api":

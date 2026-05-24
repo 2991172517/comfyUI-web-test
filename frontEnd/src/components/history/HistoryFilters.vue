@@ -1,7 +1,9 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { isAdmin } from '@/composables/useAuth.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 import ModelFilterPicker from '@/components/models/ModelFilterPicker.vue'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
@@ -9,6 +11,7 @@ import SelectNative from '@/components/ui/SelectNative.vue'
 
 const history = useHistoryStore()
 const app = useAppStore()
+const { confirmDelete } = useConfirmDialog()
 
 function onLoraChange(name) {
   history.filters.lora_name = name
@@ -16,8 +19,31 @@ function onLoraChange(name) {
   history.filters.lora_node = ''
 }
 
+const selectedCount = computed(() => history.selectedKeys.size)
+
 function apply() {
   history.refresh()
+}
+
+async function onBulkDelete() {
+  const n = selectedCount.value
+  if (!n) {
+    app.setMessage('请先勾选要删除的记录', true)
+    return
+  }
+  if (
+    !(await confirmDelete({
+      message: `确定删除已选 ${n} 条历史记录？相关图片文件将一并移除。`,
+    }))
+  )
+    return
+  try {
+    const res = await history.deleteSelected()
+    if (res.ok) app.setMessage(res.message)
+    else app.setMessage(res.message, true)
+  } catch (e) {
+    app.setMessage(e.message, true)
+  }
 }
 
 onMounted(() => {
@@ -82,5 +108,43 @@ onMounted(() => {
     <Button variant="ghost" size="sm" :disabled="history.loading" @click="history.refresh">
       {{ history.loading ? '加载中…' : '刷新' }}
     </Button>
+
+    <template v-if="isAdmin()">
+      <span class="hidden sm:block w-px h-6 bg-border self-center" aria-hidden="true" />
+      <Button
+        :variant="history.bulkSelectMode ? 'default' : 'outline'"
+        size="sm"
+        :disabled="history.loading"
+        @click="history.toggleBulkSelectMode()"
+      >
+        {{ history.bulkSelectMode ? '取消多选' : '多选' }}
+      </Button>
+      <template v-if="history.bulkSelectMode">
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="history.loading || !history.records.length"
+          @click="history.selectAllVisible"
+        >
+          全选
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          :disabled="!selectedCount"
+          @click="history.clearBulkSelection"
+        >
+          取消勾选
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          :disabled="!selectedCount || history.bulkDeleting"
+          @click="onBulkDelete"
+        >
+          {{ history.bulkDeleting ? '删除中…' : `删除选中${selectedCount ? ` (${selectedCount})` : ''}` }}
+        </Button>
+      </template>
+    </template>
   </div>
 </template>

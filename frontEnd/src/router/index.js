@@ -28,7 +28,7 @@ const routes = [
         path: 'batch',
         redirect: (to) => ({
           path: '/generate',
-          query: { ...to.query, mode: 'sweep' },
+          query: { ...to.query },
         }),
       },
       {
@@ -86,10 +86,16 @@ const routes = [
         meta: { title: '提示词', description: '全局提示词、预设库' },
       },
       {
+        path: 'settings/magnifier',
+        name: 'magnifier-settings',
+        component: () => import('@/views/MagnifierSettingsView.vue'),
+        meta: { title: '全局配置', description: '界面字号、放大镜镜头与放大倍数' },
+      },
+      {
         path: 'settings/tags',
         name: 'tag-manage',
         component: () => import('@/views/TagManagerView.vue'),
-        meta: { title: 'Tag 词库管理', description: '分类浏览、筛选搜索、增删词条与默认权重' },
+        meta: { title: 'Tag 显示管理', description: '喜好排序、隐藏分类、增删 tag' },
       },
       {
         path: 'models',
@@ -153,7 +159,7 @@ router.beforeEach((to) => {
     !allowsBatch() &&
     (to.path === '/workflows' ||
       to.name === 'workflows' ||
-      to.path.startsWith('/settings/'))
+      (to.path.startsWith('/settings/') && to.name !== 'magnifier-settings'))
   ) {
     return { path: '/generate' }
   }

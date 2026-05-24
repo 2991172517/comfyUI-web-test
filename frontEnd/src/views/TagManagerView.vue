@@ -1,13 +1,26 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowLeft, Loader2, Plus, RefreshCw, Search, Trash2, X } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  Heart,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  ThumbsDown,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
 import PageAlert from '@/components/layout/PageAlert.vue'
 import TagCategoryTree from '@/components/prompt/TagCategoryTree.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import { cn } from '@/lib/utils'
 import { api } from '@/api/client.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
+const { confirmDelete } = useConfirmDialog()
 const loadingTree = ref(true)
 const tree = ref([])
 const rootName = ref('标签库')
@@ -20,14 +33,16 @@ const searchQ = ref('')
 const categoryFilterQ = ref('')
 const globalSearchMode = ref(false)
 const listLoading = ref(false)
-const defaultWeight = ref(1)
-const settingsSaving = ref(false)
+const preferenceBusyKey = ref('')
+const expandedCategoryIds = ref({})
 
 const showAdd = ref(false)
 const addValue = ref('')
 const addName = ref('')
 const addBusy = ref(false)
 const errorMsg = ref('')
+
+const PREF_ORDER = { like: 0, dislike: 2 }
 
 function findNode(nodes, id) {
   for (const n of nodes || []) {
@@ -59,12 +74,25 @@ const selectedName = computed(() => {
   return n?.name || ''
 })
 
+const selectedNode = computed(() => findNode(tree.value, selectedCategoryId.value))
+
 const listTitle = computed(() => {
   if (globalSearchMode.value && searchQ.value.trim()) {
     return `全局搜索「${searchQ.value.trim()}」`
   }
   return selectedName.value || '请选择分类'
 })
+
+function sortByPreference(items) {
+  return [...items].sort((a, b) => {
+    const ao = PREF_ORDER[a.preference] ?? 1
+    const bo = PREF_ORDER[b.preference] ?? 1
+    if (ao !== bo) return ao - bo
+    const an = (a.name || a.value || '').toLowerCase()
+    const bn = (b.name || b.value || '').toLowerCase()
+    return an.localeCompare(bn)
+  })
+}
 
 function mapSuggestItem(item) {
   return {
@@ -73,7 +101,39 @@ function mapSuggestItem(item) {
     categoryId: item.categoryId || item.category_id || '',
     categoryPath: item.category || null,
     sourceId: item.sourceId || item.source_id || '',
+    preference: item.preference ?? null,
   }
+}
+
+function findPathToCategory(nodes, id, path = []) {
+  for (const n of nodes || []) {
+    const next = [...path, n.id]
+    if (n.id === id) return next
+    const hit = findPathToCategory(n.children, id, next)
+    if (hit) return hit
+  }
+  return null
+}
+
+function expandPathToCategory(id) {
+  const path = findPathToCategory(tree.value, id)
+  if (!path?.length) return
+  const next = { ...expandedCategoryIds.value }
+  for (const cid of path.slice(0, -1)) {
+    next[cid] = true
+  }
+  expandedCategoryIds.value = next
+}
+
+function toggleCategoryExpand(id) {
+  expandedCategoryIds.value = {
+    ...expandedCategoryIds.value,
+    [id]: !expandedCategoryIds.value[id],
+  }
+}
+
+function itemKey(item) {
+  return `${item.categoryId}::${item.value}`
 }
 
 async function loadTree() {
@@ -83,6 +143,9 @@ async function loadTree() {
     const res = await api.vocabularyCategoryTree()
     rootName.value = res.rootCategoryName || '标签库'
     tree.value = res.tree || []
+    if (selectedCategoryId.value && !findNode(tree.value, selectedCategoryId.value)) {
+      selectedCategoryId.value = ''
+    }
     if (!selectedCategoryId.value && tree.value[0]?.id) {
       selectedCategoryId.value = tree.value[0].id
     }
@@ -90,15 +153,6 @@ async function loadTree() {
     errorMsg.value = e.message || '加载分类失败'
   } finally {
     loadingTree.value = false
-  }
-}
-
-async function loadSettings() {
-  try {
-    const res = await api.vocabularyGetSettings()
-    defaultWeight.value = res.defaultWeight ?? 1
-  } catch {
-    /* ignore */
   }
 }
 
@@ -115,7 +169,7 @@ async function loadGlobalSearch() {
   offset.value = 0
   try {
     const res = await api.vocabularySuggest(q, { limit: 50 })
-    const items = (res.items || []).map(mapSuggestItem)
+    const items = sortByPreference((res.items || []).map(mapSuggestItem))
     prompts.value = items
     total.value = items.length
   } catch (e) {
@@ -142,24 +196,13 @@ async function loadPrompts(resetOffset = true) {
       offset: offset.value,
       limit,
     })
-    prompts.value = resetOffset ? res.items || [] : [...prompts.value, ...(res.items || [])]
+    const items = res.items || []
+    prompts.value = resetOffset ? items : [...prompts.value, ...items]
     total.value = res.total ?? 0
   } catch (e) {
     errorMsg.value = e.message || '加载词条失败'
   } finally {
     listLoading.value = false
-  }
-}
-
-async function saveDefaultWeight() {
-  settingsSaving.value = true
-  try {
-    const res = await api.vocabularyUpdateSettings(Number(defaultWeight.value))
-    defaultWeight.value = res.defaultWeight
-  } catch (e) {
-    errorMsg.value = e.message || '保存默认权重失败'
-  } finally {
-    settingsSaving.value = false
   }
 }
 
@@ -184,7 +227,9 @@ async function submitAdd() {
 }
 
 async function removePrompt(item) {
-  if (!confirm(`删除词条「${item.name || item.value}」？`)) return
+  if (!(await confirmDelete({ message: `确定删除 tag「${item.name || item.value}」？此操作不可撤销。` }))) {
+    return
+  }
   const categoryId = item.categoryId || selectedCategoryId.value
   if (!categoryId) {
     errorMsg.value = '无法确定词条所属分类'
@@ -198,6 +243,74 @@ async function removePrompt(item) {
     await loadPrompts(true)
   } catch (e) {
     errorMsg.value = e.message || '删除失败'
+  }
+}
+
+async function removeCategory(node) {
+  if (!node?.id) return
+  const name = node?.name || node?.id || '该分类'
+  let countHint = ''
+  try {
+    const res = await api.vocabularyCategoryCount(node.id)
+    countHint = res.total ? `（含约 ${res.total} 个 tag` : ''
+    if (node.children?.length) {
+      countHint += countHint ? '，含子分类）' : '（含子分类）'
+    } else if (countHint) {
+      countHint += '）'
+    }
+  } catch {
+    /* ignore count */
+  }
+
+  if (
+    !(await confirmDelete({
+      title: '删除 tag 组',
+      message: `确定删除分类「${name}」${countHint}？\n\n将从标签选择器中隐藏该组及其子分类，已写入提示词的 tag 文本不会自动移除。`,
+    }))
+  ) {
+    return
+  }
+
+  try {
+    await api.vocabularyDeleteCategory(node.id)
+    if (selectedCategoryId.value === node.id) {
+      selectedCategoryId.value = ''
+    }
+    await loadTree()
+    prompts.value = []
+    total.value = 0
+  } catch (e) {
+    errorMsg.value = e.message || '删除分类失败'
+  }
+}
+
+async function setPreference(item, preference) {
+  const categoryId = item.categoryId || selectedCategoryId.value
+  if (!categoryId) return
+
+  const current = item.preference || null
+  let next = preference
+  if (current === preference) next = 'neutral'
+
+  const key = itemKey(item)
+  preferenceBusyKey.value = key
+  errorMsg.value = ''
+  try {
+    const res = await api.vocabularySetTagPreference({
+      categoryId,
+      value: item.value,
+      preference: next,
+    })
+    const applied = res.preference ?? null
+    prompts.value = sortByPreference(
+      prompts.value.map((p) =>
+        itemKey(p) === key ? { ...p, preference: applied } : p,
+      ),
+    )
+  } catch (e) {
+    errorMsg.value = e.message || '保存偏好失败'
+  } finally {
+    preferenceBusyKey.value = ''
   }
 }
 
@@ -224,12 +337,17 @@ watch(searchQ, () => {
   searchTimer = setTimeout(() => loadPrompts(true), 300)
 })
 
-watch(selectedCategoryId, () => {
+watch(selectedCategoryId, (id) => {
   if (selectedCategoryId.value && !searchQ.value.trim()) loadPrompts(true)
+  if (id) expandPathToCategory(id)
+})
+
+watch(tree, () => {
+  if (selectedCategoryId.value) expandPathToCategory(selectedCategoryId.value)
 })
 
 onMounted(async () => {
-  await Promise.all([loadTree(), loadSettings()])
+  await loadTree()
 })
 </script>
 
@@ -246,8 +364,11 @@ onMounted(async () => {
           <ArrowLeft class="h-3.5 w-3.5" />
           返回提示词设置
         </RouterLink>
+        <h1 class="text-base font-semibold text-foreground">
+          Tag 显示管理
+        </h1>
         <p class="text-xs text-muted-foreground">
-          分类来自 manifest（{{ rootName }}），用户新增/删除保存在服务端覆盖文件
+          设置 tag 喜欢/不喜欢（影响排序：喜欢靠前、不喜欢靠后），可删除单个 tag 或整组分类
         </p>
       </div>
       <Button
@@ -257,26 +378,8 @@ onMounted(async () => {
         @click="loadTree"
       >
         <RefreshCw class="mr-1 h-3.5 w-3.5" />
-        刷新分类
+        刷新
       </Button>
-    </div>
-
-    <div class="relative">
-      <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        v-model="searchQ"
-        placeholder="搜索英文 tag 或中文名称（全库匹配，最多 50 条）…"
-        class="h-10 pl-9 pr-9 text-sm"
-      />
-      <button
-        v-if="searchQ"
-        type="button"
-        class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label="清空搜索"
-        @click="clearSearch"
-      >
-        <X class="h-4 w-4" />
-      </button>
     </div>
 
     <p
@@ -287,10 +390,12 @@ onMounted(async () => {
     </p>
 
     <div
-      class="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-3 md:flex-row md:min-h-[32rem]"
+      class="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-3 md:flex-row md:min-h-[32rem] md:items-stretch"
     >
-      <aside class="w-full shrink-0 md:w-56 lg:w-64">
-        <p class="mb-2 text-xs font-medium text-muted-foreground">分类</p>
+      <aside class="w-full shrink-0 md:w-56 lg:w-64 flex flex-col min-h-0">
+        <p class="mb-2 text-xs font-medium text-muted-foreground">
+          分类（hover 可删组）
+        </p>
         <Input
           v-model="categoryFilterQ"
           placeholder="筛选分类名称…"
@@ -303,47 +408,50 @@ onMounted(async () => {
           <Loader2 class="h-4 w-4 animate-spin" />
           加载中…
         </div>
-        <div
+        <p
           v-else-if="!filteredTree.length"
           class="text-xs text-muted-foreground"
         >
           无匹配分类
-        </div>
+        </p>
         <div
           v-else
-          class="max-h-[28rem] overflow-y-auto pr-1"
+          class="flex-1 min-h-0 max-h-[28rem] overflow-y-auto pr-1"
         >
           <TagCategoryTree
             :nodes="filteredTree"
             :selected-id="selectedCategoryId"
+            :expanded-ids="expandedCategoryIds"
+            manageable
             @select="onSelectCategory"
+            @delete="removeCategory"
+            @toggle-expand="toggleCategoryExpand"
           />
         </div>
       </aside>
 
-      <main class="min-w-0 flex-1 flex flex-col gap-3">
+      <main class="min-w-0 flex-1 flex flex-col gap-3 min-h-0">
         <div
-          class="flex flex-wrap items-end gap-3 rounded-md border border-border/60 bg-muted/20 p-3"
+          class="rounded-md border border-border/60 bg-muted/20 p-3"
         >
-          <label class="text-xs">
-            <span class="text-muted-foreground">默认权重（新建 tag 参考）</span>
+          <label class="block text-xs text-muted-foreground mb-1.5">搜索 tag</label>
+          <div class="relative">
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              v-model.number="defaultWeight"
-              type="number"
-              step="0.05"
-              min="0.05"
-              max="2"
-              class="mt-1 h-8 w-24 text-xs"
+              v-model="searchQ"
+              placeholder="英文 tag 或中文名称（全库匹配，最多 50 条）…"
+              class="h-9 pl-9 pr-9 text-sm"
             />
-          </label>
-          <Button
-            size="sm"
-            variant="secondary"
-            :disabled="settingsSaving"
-            @click="saveDefaultWeight"
-          >
-            保存
-          </Button>
+            <button
+              v-if="searchQ"
+              type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="清空搜索"
+              @click="clearSearch"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -359,6 +467,16 @@ onMounted(async () => {
           >
             全库搜索中，点击左侧分类可退出
           </span>
+          <Button
+            v-if="selectedCategoryId && !globalSearchMode"
+            size="sm"
+            variant="outline"
+            class="text-destructive hover:text-destructive"
+            @click="removeCategory(selectedNode)"
+          >
+            <Trash2 class="h-3.5 w-3.5 mr-1" />
+            删除此组
+          </Button>
           <Button
             size="sm"
             :disabled="!selectedCategoryId || globalSearchMode"
@@ -409,20 +527,46 @@ onMounted(async () => {
           {{ globalSearchMode ? '搜索中…' : '加载词条…' }}
         </div>
 
-        <ul
+        <div
           v-else
-          class="flex-1 divide-y divide-border/60 overflow-y-auto rounded-md border border-border/50 max-h-[22rem]"
+          class="flex flex-1 min-h-0 flex-wrap content-start gap-2 overflow-y-auto rounded-md border border-border/50 p-3"
         >
-          <li
+          <article
             v-for="item in prompts"
-            :key="`${item.categoryId}-${item.value}`"
-            class="flex items-start gap-2 px-3 py-2 text-xs hover:bg-muted/30"
+            :key="itemKey(item)"
+            :class="
+              cn(
+                'inline-flex max-w-full flex-col rounded-lg border px-2.5 py-2 text-xs transition-colors',
+                item.preference === 'like'
+                  ? 'border-emerald-500/35 bg-emerald-500/5'
+                  : item.preference === 'dislike'
+                    ? 'border-orange-500/35 bg-orange-500/5 opacity-90'
+                    : 'border-border/60 bg-muted/20 hover:bg-muted/35',
+              )
+            "
           >
-            <div class="min-w-0 flex-1">
-              <div class="font-medium text-foreground">
-                {{ item.name || item.value }}
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-1">
+                <span class="font-medium text-foreground leading-snug">
+                  {{ item.name || item.value }}
+                </span>
+                <span
+                  v-if="item.preference === 'like'"
+                  class="rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-600"
+                >
+                  喜欢
+                </span>
+                <span
+                  v-else-if="item.preference === 'dislike'"
+                  class="rounded bg-orange-500/15 px-1 text-[10px] text-orange-600"
+                >
+                  不喜欢
+                </span>
               </div>
-              <div class="font-mono text-[10px] text-muted-foreground break-all">
+              <div
+                v-if="item.name && item.name !== item.value"
+                class="font-mono text-[11px] text-muted-foreground break-all leading-snug mt-0.5"
+              >
                 {{ item.value }}
               </div>
               <p
@@ -439,23 +583,56 @@ onMounted(async () => {
                 用户添加
               </span>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7 shrink-0 text-destructive"
-              aria-label="删除"
-              @click="removePrompt(item)"
-            >
-              <Trash2 class="h-3.5 w-3.5" />
-            </Button>
-          </li>
-          <li
+
+            <div class="mt-2 flex shrink-0 items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :class="item.preference === 'like' ? 'text-emerald-600' : 'text-muted-foreground'"
+                :disabled="preferenceBusyKey === itemKey(item)"
+                aria-label="喜欢"
+                :title="item.preference === 'like' ? '取消喜欢' : '标记为喜欢'"
+                @click="setPreference(item, 'like')"
+              >
+                <Heart
+                  class="h-3.5 w-3.5"
+                  :class="item.preference === 'like' ? 'fill-current' : ''"
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :class="item.preference === 'dislike' ? 'text-orange-600' : 'text-muted-foreground'"
+                :disabled="preferenceBusyKey === itemKey(item)"
+                aria-label="不喜欢"
+                :title="item.preference === 'dislike' ? '取消不喜欢' : '标记为不喜欢'"
+                @click="setPreference(item, 'dislike')"
+              >
+                <ThumbsDown
+                  class="h-3.5 w-3.5"
+                  :class="item.preference === 'dislike' ? 'fill-current' : ''"
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7 text-destructive"
+                aria-label="删除 tag"
+                @click="removePrompt(item)"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </article>
+          <p
             v-if="!prompts.length && !listLoading"
-            class="px-3 py-8 text-center text-xs text-muted-foreground"
+            class="w-full py-8 text-center text-xs text-muted-foreground"
           >
             {{ globalSearchMode ? '未找到匹配词条' : '该分类下暂无词条' }}
-          </li>
-        </ul>
+          </p>
+        </div>
 
         <Button
           v-if="!globalSearchMode && prompts.length < total"

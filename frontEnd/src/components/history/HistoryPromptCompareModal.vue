@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, toRef } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 import Button from '@/components/ui/Button.vue'
 import { comparePromptItems } from '@/lib/promptCompare.js'
 import { X } from 'lucide-vue-next'
@@ -10,6 +11,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+const backdropRef = ref(null)
+const panelRef = ref(null)
+useModalMotion(toRef(() => props.open), backdropRef, panelRef)
 
 const result = computed(() => comparePromptItems(props.items))
 
@@ -22,10 +26,12 @@ function sideTitle(side) {
   <Teleport to="body">
     <div
       v-if="open && items.length >= 2"
+      ref="backdropRef"
       class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       @click.self="emit('close')"
     >
       <div
+        ref="panelRef"
         class="flex max-h-[min(92vh,920px)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl"
         role="dialog"
         aria-modal="true"

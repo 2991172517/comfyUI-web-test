@@ -24,10 +24,12 @@ import { buildBatchFavoritePayload } from '@/utils/favoritePayload.js'
 import { ArrowLeft, GitCompare, Trash2 } from 'lucide-vue-next'
 import { isAdmin } from '@/composables/useAuth.js'
 import { useImageDownload } from '@/composables/useImageDownload.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const emit = defineEmits(['back', 'deleted'])
 
 const history = useHistoryStore()
+const { confirmDelete } = useConfirmDialog()
 const app = useAppStore()
 const router = useRouter()
 const deleting = ref(false)
@@ -243,7 +245,12 @@ async function deleteSelectedCells() {
     app.setMessage('请先勾选要删除的图片', true)
     return
   }
-  if (!confirm(`确定删除选中的 ${indices.length} 张？对应输出文件将移除。`)) return
+  if (
+    !(await confirmDelete({
+      message: `确定删除选中的 ${indices.length} 张？对应输出文件将移除。`,
+    }))
+  )
+    return
   deleting.value = true
   try {
     const res = await history.deleteBatchItems(entry.value.batch_id, indices)
@@ -278,7 +285,12 @@ function saveCellImage(cell) {
 async function deleteWholeBatch() {
   const id = entry.value?.batch_id
   if (!id) return
-  if (!confirm(`删除整批「${id}」？将移除该批次下所有图片与记录。`)) return
+  if (
+    !(await confirmDelete({
+      message: `删除整批「${id}」？将移除该批次下所有图片与记录。`,
+    }))
+  )
+    return
   deleting.value = true
   try {
     await history.deleteBatch(id)

@@ -7,8 +7,12 @@ import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { catalogThumb, modelDisplayTitle } from '@/lib/modelDisplay.js'
 import { cn } from '@/lib/utils'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 
 const open = defineModel('open', { type: Boolean, default: false })
+const backdropRef = ref(null)
+const panelRef = ref(null)
+useModalMotion(open, backdropRef, panelRef)
 
 const props = defineProps({
   checkpointName: { type: String, required: true },
@@ -144,6 +148,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[85] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55"
       role="dialog"
       aria-modal="true"
@@ -151,6 +156,7 @@ onUnmounted(() => {
       @click.self="close"
     >
       <div
+        ref="panelRef"
         class="flex max-h-[min(90vh,780px)] w-full sm:max-w-4xl flex-col rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
         @click.stop
       >

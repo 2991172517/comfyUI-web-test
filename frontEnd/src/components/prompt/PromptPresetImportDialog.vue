@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, toRef, watch } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 import { api } from '@/api/client.js'
 import { openGlobalPromptModal } from '@/composables/useGlobalPromptModal.js'
 import { normalizePromptConfig } from '@/composables/usePromptConfig.js'
@@ -17,6 +18,9 @@ const emit = defineEmits(['update:open', 'import'])
 const presets = ref([])
 const selectedId = ref('')
 const loading = ref(false)
+const backdropRef = ref(null)
+const panelRef = ref(null)
+useModalMotion(toRef(() => props.open), backdropRef, panelRef)
 
 async function refresh() {
   loading.value = true
@@ -77,10 +81,12 @@ onMounted(() => {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[95] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       @click="onBackdrop"
     >
       <div
+        ref="panelRef"
         class="w-full max-w-md rounded-xl border border-border bg-card shadow-xl"
         role="dialog"
         aria-modal="true"

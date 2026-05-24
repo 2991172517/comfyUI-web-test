@@ -16,6 +16,7 @@ import Alert from '@/components/ui/Alert.vue'
 import ModelVisualPicker from '@/components/models/ModelVisualPicker.vue'
 import { cn } from '@/lib/utils'
 import { isAdmin } from '@/composables/useAuth.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const props = defineProps({
   workflowId: { type: String, required: true },
@@ -25,6 +26,7 @@ const emit = defineEmits(['saved', 'loaded'])
 
 const router = useRouter()
 const app = useAppStore()
+const { confirmDelete } = useConfirmDialog()
 const loading = ref(false)
 const saving = ref(false)
 const essentials = ref(null)
@@ -107,7 +109,13 @@ async function addLora(role) {
 
 async function removeLora(nodeId) {
   if (readOnly.value) return
-  if (!confirm('从链中移除此 LoRA 节点？')) return
+  if (
+    !(await confirmDelete({
+      title: '移除 LoRA',
+      message: '从链中移除此 LoRA 节点？',
+    }))
+  )
+    return
   try {
     const res = await api.removeLoraSlot(props.workflowId, nodeId)
     essentials.value = res

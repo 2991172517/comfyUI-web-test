@@ -11,6 +11,7 @@ import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useFavorites } from '@/composables/useFavorites.js'
 import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const emit = defineEmits(['apply'])
 
@@ -19,6 +20,7 @@ const favorites = ref([])
 const loading = ref(false)
 const lightboxRef = ref(null)
 const { refreshFavorites } = useFavorites()
+const { confirmDelete } = useConfirmDialog()
 
 async function load() {
   loading.value = true
@@ -36,7 +38,13 @@ function applyToWorkflow(fav) {
 }
 
 async function remove(id) {
-  if (!confirm('取消收藏？（仅删除记录，不删原图）')) return
+  if (
+    !(await confirmDelete({
+      title: '取消收藏',
+      message: '仅删除收藏记录，不删除原图。确定继续？',
+    }))
+  )
+    return
   const entry = favorites.value.find((f) => f.id === id)
   const body = favoriteEntryToTogglePayload(entry)
   if (!body?.image?.filename) {

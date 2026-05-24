@@ -36,13 +36,13 @@ watch(
         <strong>{{ batch.plannedTotal }}</strong> 张）
       </CardDescription>
     </CardHeader>
-    <CardContent class="space-y-4">
+    <CardContent class="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))]">
       <article
         v-for="(l, chainIdx) in batch.loras"
         :key="l.node_id"
         :class="
           cn(
-            'rounded-lg border p-4 space-y-3',
+            'flex h-full min-w-0 flex-col gap-3 rounded-lg border p-4',
             batch.loraAxisState[l.node_id]?.enabled
               ? 'border-primary/50 bg-primary/5'
               : 'border-border',
@@ -52,9 +52,6 @@ watch(
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <span class="font-medium">#{{ l.node_id }} {{ l.short_name }}</span>
-            <Badge v-if="l.role" variant="secondary" class="ml-2 text-[10px]">
-              {{ l.role === 'style' ? 'Style' : l.role === 'character' ? '角色' : l.role }}
-            </Badge>
             <Badge variant="outline" class="ml-2 text-[10px]">链 {{ chainIdx + 1 }}</Badge>
             <Badge
               v-if="batch.loraAxisState[l.node_id]?.enabled"

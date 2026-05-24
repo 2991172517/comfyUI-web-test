@@ -271,8 +271,25 @@ def _load_single_record(prompt_id: str) -> dict | None:
     return _single_to_timeline(rec)
 
 
-def _single_to_timeline(rec: dict | None) -> dict | None:
+def _single_visible_in_history(rec: dict | None) -> bool:
+    """取消、无图 pending 等不进入历史列表。"""
     if not rec:
+        return False
+    status = str(rec.get("status") or "")
+    images = rec.get("images") or []
+    if status == "cancelled":
+        return False
+    if status == "completed" and images:
+        return True
+    if status == "failed" and images:
+        return True
+    if status in ("pending", "running", "in_progress") and not images:
+        return False
+    return bool(images)
+
+
+def _single_to_timeline(rec: dict | None) -> dict | None:
+    if not _single_visible_in_history(rec):
         return None
     images = rec.get("images") or []
     thumb = images[0].get("url") if images else None
@@ -415,6 +432,7 @@ def list_history(
         )
     ]
     pool.sort(key=lambda e: _parse_iso(e.get("started_at")), reverse=True)
+    sweep_abandoned_single_dirs(limit=min(80, limit * 2))
     return pool[:limit]
 
 
@@ -513,6 +531,46 @@ def get_single_detail(prompt_id: str) -> dict | None:
     return {**rec, **item, "meta": meta}
 
 
+def abandon_single_record(prompt_id: str) -> dict:
+    """取消或废弃的单抽：删除记录目录、残留图片与 Comfy 历史。"""
+    pid = str(prompt_id or "").strip()
+    if not pid:
+        raise ValueError("缺少 prompt_id")
+    path = _record_path(pid)
+    if not path.is_file() and not _single_dir(pid).is_dir():
+        return {"ok": True, "prompt_id": pid, "deleted_files": [], "skipped": True}
+    return delete_single_record(pid)
+
+
+def sweep_abandoned_single_dirs(*, limit: int = 200) -> dict:
+    """清理无有效输出的单抽目录（取消残留、空 pending 等）。"""
+    root = OUTPUT_DIR / SINGLE_OUTPUT_PREFIX
+    if not root.is_dir():
+        return {"ok": True, "removed": []}
+    removed: list[str] = []
+    dirs = sorted(
+        [p for p in root.iterdir() if p.is_dir()],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )[:limit]
+    for d in dirs:
+        try:
+            with open(d / RECORD_FILENAME, encoding="utf-8") as f:
+                rec = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            rec = None
+        if rec and _single_visible_in_history(rec):
+            continue
+        try:
+            abandon_single_record(d.name)
+            removed.append(d.name)
+        except Exception as exc:
+            log.warning("sweep single %s: %s", d.name, exc)
+    if removed:
+        log.info("已清理废弃单抽目录 %d 个", len(removed))
+    return {"ok": True, "removed": removed}
+
+
 def delete_single_record(prompt_id: str) -> dict:
     """删除单抽历史目录与输出图。"""
     import shutil
@@ -557,3 +615,46 @@ def delete_batch_record(batch_id: str) -> dict:
 def delete_batch_items(batch_id: str, indices: list[int]) -> dict:
     """删除批量中的指定格子。"""
     return batch_service.delete_batch_items(batch_id, indices)
+
+
+def bulk_delete_records(
+    singles: list[str] | None = None,
+    batches: list[str] | None = None,
+) -> dict:
+    """批量删除历史时间线条目（单抽 + 整批）。"""
+    deleted_singles: list[str] = []
+    deleted_batches: list[str] = []
+    failed: list[dict] = []
+
+    for pid in singles or []:
+        pid = str(pid or "").strip()
+        if not pid:
+            continue
+        try:
+            if not get_single_detail(pid):
+                failed.append({"type": "single", "id": pid, "error": "记录不存在"})
+                continue
+            delete_single_record(pid)
+            deleted_singles.append(pid)
+        except Exception as exc:
+            failed.append({"type": "single", "id": pid, "error": str(exc)})
+
+    for bid in batches or []:
+        bid = str(bid or "").strip()
+        if not bid:
+            continue
+        try:
+            if not batch_service.get_batch(bid) and not batch_service._read_manifest(bid):
+                failed.append({"type": "batch", "id": bid, "error": "记录不存在"})
+                continue
+            delete_batch_record(bid)
+            deleted_batches.append(bid)
+        except Exception as exc:
+            failed.append({"type": "batch", "id": bid, "error": str(exc)})
+
+    return {
+        "ok": len(failed) == 0,
+        "deleted_singles": deleted_singles,
+        "deleted_batches": deleted_batches,
+        "failed": failed,
+    }

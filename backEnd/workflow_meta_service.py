@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -46,9 +47,32 @@ def _meta_path_for_workflow(workflow_id: str) -> Path:
     return WORKFLOWS_DIR / f"{workflow_id}{META_SUFFIX}"
 
 
-def _variant_json_path(variant_id: str) -> Path:
-    safe = re.sub(r"[^\w\-]+", "_", variant_id.strip()).strip("_")
+def sanitize_variant_id(raw: str) -> str:
+    return re.sub(r"[^\w\-]+", "_", (raw or "").strip()).strip("_")
+
+
+def _variant_exists(safe: str) -> bool:
+    return _variant_json_path(safe, strict=False).exists() or (
+        WORKFLOW_VARIANTS_DIR / f"{safe}{META_SUFFIX}"
+    ).exists()
+
+
+def allocate_variant_id(base: str | None = None) -> str:
+    """分配唯一子工作流 ID；base 可为显示名或文件名 stem。"""
+    safe = sanitize_variant_id(base) if base else ""
     if not safe:
+        safe = f"variant_{uuid.uuid4().hex[:8]}"
+    candidate = safe
+    n = 2
+    while _variant_exists(candidate):
+        candidate = f"{safe}_{n}"
+        n += 1
+    return candidate
+
+
+def _variant_json_path(variant_id: str, *, strict: bool = True) -> Path:
+    safe = sanitize_variant_id(variant_id)
+    if not safe and strict:
         raise ValueError("子工作流 ID 无效")
     return WORKFLOW_VARIANTS_DIR / f"{safe}.json"
 
@@ -146,14 +170,22 @@ def list_variants() -> list[dict]:
     return items
 
 
-def create_variant(variant_id: str, display_name: str | None = None, *, copy_template: bool = True) -> dict:
-    safe = re.sub(r"[^\w\-]+", "_", variant_id.strip()).strip("_")
-    if not safe:
-        raise ValueError("子工作流 ID 无效")
+def create_variant(
+    variant_id: str | None = None,
+    display_name: str | None = None,
+    *,
+    copy_template: bool = True,
+) -> dict:
+    if variant_id:
+        safe = sanitize_variant_id(variant_id)
+        if not safe:
+            raise ValueError("子工作流 ID 无效")
+        if _variant_exists(safe):
+            raise ValueError(f"子工作流已存在: {safe}")
+    else:
+        safe = allocate_variant_id(display_name)
     json_path = _variant_json_path(safe)
     meta_path = WORKFLOW_VARIANTS_DIR / f"{safe}{META_SUFFIX}"
-    if json_path.exists():
-        raise ValueError(f"子工作流已存在: {safe}")
 
     template_meta = load_meta(WORKFLOW_TEMPLATE_ID) or _infer_meta_from_template(WORKFLOW_TEMPLATE_ID)
     if copy_template:
@@ -192,12 +224,16 @@ def apply_topology(prompt: dict, meta: dict) -> dict:
 
     topo = meta.get("topology") or {}
     bypass = topo.get("style_bypass_when_disabled") or {}
+    valid_ids = {str(k) for k in result}
     for rule in bypass.get("rewire") or []:
         nid = str(rule.get("target_node"))
         key = rule.get("input_key")
         src = rule.get("source")
-        if nid in result and key and src:
-            result[nid].setdefault("inputs", {})[key] = copy.deepcopy(src)
+        if not (nid in result and key and src):
+            continue
+        if isinstance(src, list) and len(src) >= 1 and str(src[0]) not in valid_ids:
+            continue
+        result[nid].setdefault("inputs", {})[key] = copy.deepcopy(src)
 
     future = topo.get("future_conditioning_style") or {}
     if future.get("enabled") and future.get("node_id"):

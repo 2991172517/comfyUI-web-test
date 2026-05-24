@@ -21,6 +21,7 @@ import {
   loadCivitaiApiKey,
 } from '@/composables/useCivitaiApiKey.js'
 import { cn } from '@/lib/utils'
+import { staggerReveal } from '@/lib/gsap/motion.js'
 import {
   ChevronLeft,
   ChevronRight,
@@ -93,6 +94,16 @@ const hasApiKey = computed(() => hasCivitaiApiKey(civitaiApiKey.value))
 const displayItems = computed(() =>
   mainTab.value === 'favorites' ? favoriteItems.value : items.value,
 )
+const civitaiGridRef = ref(null)
+
+async function revealCivitaiGrid() {
+  await nextTick()
+  const els = civitaiGridRef.value?.querySelectorAll('[data-stagger-item]')
+  if (els?.length) staggerReveal(els)
+}
+
+watch(() => displayItems.value.length, revealCivitaiGrid)
+watch(mainTab, revealCivitaiGrid)
 const contentModeHint = computed(() => {
   if (contentMode.value === 'nsfw') {
     return '红 C 站（NSFW）：官方 API 仍走 civitai.com，通过 nsfw=true 拉取；链接指向 civitai.red'
@@ -602,11 +613,13 @@ watch(contentMode, onContentModeChange)
 
           <div
             v-else-if="displayItems.length"
+            ref="civitaiGridRef"
             class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
           >
             <article
               v-for="item in displayItems"
               :key="mainTab === 'favorites' ? `fav-${item.id}` : `${page}-${item.id}`"
+              data-stagger-item
               :class="
                 cn(
                   'cursor-pointer overflow-hidden rounded-xl border-2 bg-card transition-all hover:shadow-md',

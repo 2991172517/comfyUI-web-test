@@ -1,14 +1,16 @@
 <script setup>
 import { computed, ref, nextTick, toRef } from 'vue'
 import { cn } from '@/lib/utils'
-import { PROMPT_FORMAT_HINT, validateComfyPromptText } from '@/lib/promptFormatValidate.js'
-import { applyDotWeightWrap } from '@/lib/promptTokenAtCursor.js'
+import { PROMPT_COLON_WEIGHT_HINT, PROMPT_FORMAT_HINT, validateComfyPromptText } from '@/lib/promptFormatValidate.js'
+import { applyColonWeightUnwrap, applyColonWeightWrap } from '@/lib/promptTokenAtCursor.js'
 import { splitPromptTokens, dedupePromptText } from '@/lib/promptDisplay.js'
 import { lookupKeyForVocabulary } from '@/lib/promptTagWeight.js'
+import { togglePromptTag } from '@/lib/appendPromptTag.js'
 import { usePromptAutocomplete } from '@/composables/usePromptAutocomplete.js'
 import { usePromptEditorMode } from '@/composables/usePromptEditorMode.js'
 import PromptAutocompleteDropdown from '@/components/prompt/PromptAutocompleteDropdown.vue'
 import PromptTagEditor from '@/components/prompt/PromptTagEditor.vue'
+import PromptTagPickerPanel from '@/components/prompt/PromptTagPickerPanel.vue'
 
 const model = defineModel({ type: String, default: '' })
 
@@ -21,6 +23,12 @@ const props = defineProps({
   autocomplete: { type: Boolean, default: true },
   /** 覆盖全局编辑器模式；不传则读全局设置 */
   editorMode: { type: String, default: '' },
+  /** 传入 PromptTagEditor：positive | negative */
+  promptSide: { type: String, default: '' },
+  /** 允许垂直拖拽调整高度 */
+  resizable: { type: Boolean, default: true },
+  /** 显示「: 权重包装」快捷键说明 */
+  showColonHint: { type: Boolean, default: false },
 })
 
 const { mode: globalMode } = usePromptEditorMode()
@@ -86,6 +94,27 @@ function onInput() {
   if (useAutocomplete.value) scheduleSuggest()
 }
 
+function applyPromptEditResult(event, result) {
+  if (!result) return false
+  event.preventDefault()
+  event.stopPropagation()
+  acClose()
+  const { newText, newCursor } = result
+  model.value = newText
+  nextTick(() => {
+    const target = textareaRef.value
+    if (!target) return
+    target.focus()
+    try {
+      target.setSelectionRange(newCursor, newCursor)
+    } catch {
+      /* ignore if element detached */
+    }
+  })
+  if (touched.value) runValidate()
+  return true
+}
+
 function onKeydown(event) {
   if (useAutocomplete.value && acOnKeydown(event)) return
 
@@ -107,30 +136,28 @@ function onKeydown(event) {
     }
   }
 
-  if (event.key === '.' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    const el = textareaRef.value
-    if (!el || props.disabled) return
-    const cursor = el.selectionStart ?? 0
-    if (cursor !== el.selectionEnd) return
-    const result = applyDotWeightWrap(el.value, cursor)
-    if (result) {
-      event.preventDefault()
-      event.stopPropagation()
-      acClose()
-      const { newText, newCursor } = result
-      model.value = newText
-      nextTick(() => {
-        const target = textareaRef.value
-        if (!target) return
-        target.focus()
-        try {
-          target.setSelectionRange(newCursor, newCursor)
-        } catch {
-          /* ignore if element detached */
-        }
-      })
-      if (touched.value) runValidate()
-    }
+  const el = textareaRef.value
+  if (!el || props.disabled || effectiveMode.value === 'tags') return
+  const cursor = el.selectionStart ?? 0
+  if (cursor !== el.selectionEnd) return
+
+  if (
+    (event.key === ':' || event.key === '：')
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+  ) {
+    if (applyPromptEditResult(event, applyColonWeightWrap(el.value, cursor))) return
+  }
+
+  if (
+    (event.key === 'Backspace' || event.key === 'Delete')
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+  ) {
+    const unwrapCursor = event.key === 'Backspace' ? cursor : cursor
+    if (applyPromptEditResult(event, applyColonWeightUnwrap(el.value, unwrapCursor))) return
   }
 }
 
@@ -139,50 +166,93 @@ function onAutocompleteSelect(index) {
   if (t != null) model.value = t
 }
 
+function onTagPick(insertText) {
+  const { text, changed } = togglePromptTag(model.value, insertText)
+  if (changed) {
+    model.value = text
+    if (touched.value) runValidate()
+  }
+}
+
 const invalid = computed(() => props.validate && touched.value && issues.value.length > 0)
 const hint = computed(() => issues.value.join('；'))
+const showColonWeightHint = computed(
+  () => props.showColonHint && effectiveMode.value !== 'tags',
+)
 </script>
 
 <template>
-  <div class="space-y-1">
-    <PromptTagEditor
-      v-if="effectiveMode === 'tags'"
-      v-model="model"
-      :disabled="disabled"
-      :class="props.class"
-    />
-
-    <template v-else>
-      <textarea
-        ref="textareaRef"
+  <div class="space-y-1.5">
+    <div
+      class="relative"
+      :class="
+        effectiveMode === 'tags' && resizable
+          ? 'flex max-h-[min(70vh,32rem)] min-h-[8.5rem] flex-col overflow-hidden resize-y rounded-md border border-input bg-background'
+          : effectiveMode === 'tags'
+            ? 'flex max-h-[min(70vh,32rem)] min-h-[8.5rem] flex-col overflow-hidden rounded-md border border-input bg-background'
+            : ''
+      "
+    >
+      <PromptTagEditor
+        v-if="effectiveMode === 'tags'"
         v-model="model"
-        :rows="props.rows"
         :disabled="disabled"
-        :placeholder="placeholder"
+        :prompt-side="promptSide"
         :class="
           cn(
-            'flex min-h-[8.5rem] w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
-            invalid
-              ? 'border-destructive ring-destructive/30 focus-visible:ring-destructive/40'
-              : 'border-input focus-visible:ring-ring',
+            effectiveMode === 'tags'
+              ? 'flex min-h-0 flex-1 flex-col border-0 bg-transparent p-2 shadow-none focus-within:ring-0'
+              : '',
             props.class,
           )
         "
-        @blur="onBlur"
-        @input="onInput"
-        @keydown="onKeydown"
       />
-      <PromptAutocompleteDropdown
-        v-if="useAutocomplete"
-        :open="acOpen"
-        :loading="acLoading"
-        :items="acItems"
-        :selected-index="acSelectedIndex"
-        :position="acPosition"
-        @select="onAutocompleteSelect"
-        @close="acClose"
-      />
-    </template>
+
+      <template v-else>
+        <textarea
+          ref="textareaRef"
+          v-model="model"
+          data-prompt-text-source
+          :data-prompt-side="promptSide || undefined"
+          :rows="props.rows"
+          :disabled="disabled"
+          :placeholder="placeholder"
+          :class="
+            cn(
+              'flex min-h-[8.5rem] w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 overflow-y-auto',
+              resizable && 'max-h-[min(70vh,32rem)] resize-y',
+              invalid
+                ? 'border-destructive ring-destructive/30 focus-visible:ring-destructive/40'
+                : 'border-input focus-visible:ring-ring',
+              props.class,
+            )
+          "
+          @blur="onBlur"
+          @input="onInput"
+          @keydown="onKeydown"
+        />
+        <PromptAutocompleteDropdown
+          v-if="useAutocomplete"
+          :open="acOpen"
+          :loading="acLoading"
+          :items="acItems"
+          :selected-index="acSelectedIndex"
+          :position="acPosition"
+          @select="onAutocompleteSelect"
+          @close="acClose"
+        />
+      </template>
+    </div>
+
+    <PromptTagPickerPanel
+      :model-value="model"
+      :disabled="disabled"
+      @select="onTagPick"
+    />
+
+    <p v-if="showColonWeightHint && !invalid" class="text-xs leading-snug text-muted-foreground">
+      {{ PROMPT_COLON_WEIGHT_HINT }}
+    </p>
 
     <p v-if="invalid" class="text-[11px] text-destructive leading-snug">
       {{ hint }}。{{ PROMPT_FORMAT_HINT }}

@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 import { X } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { splitSourceUrl } from '@/lib/modelDescription.js'
@@ -23,6 +24,9 @@ const saving = ref(false)
 const error = ref('')
 
 const title = computed(() => props.name || '模型说明')
+const backdropRef = ref(null)
+const panelRef = ref(null)
+useModalMotion(toRef(() => props.open), backdropRef, panelRef)
 
 watch(
   () => [props.open, props.initialSummary, props.name],
@@ -77,10 +81,12 @@ function onBackdrop(e) {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[85] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm"
       @click="onBackdrop"
     >
       <div
+        ref="panelRef"
         class="flex max-h-[min(90vh,640px)] w-full max-w-lg flex-col overflow-hidden rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
         role="dialog"
         aria-modal="true"

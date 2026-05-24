@@ -43,9 +43,26 @@ def ensure_index(force: bool = False) -> None:
 def suggest(query: str, limit: int = 12) -> dict:
     ensure_index()
     t0 = time.perf_counter()
-    items = index.suggest(Path(VOCABULARY_DB_PATH), query, limit=limit)
+    items = index.suggest(Path(VOCABULARY_DB_PATH), query, limit=max(limit, 50))
+    items = _sort_suggest_by_preference(items)[:limit]
     took_ms = int((time.perf_counter() - t0) * 1000)
     return {"items": items, "query": query, "tookMs": took_ms}
+
+
+def _sort_suggest_by_preference(items: list) -> list:
+    from .user_store import load, preference_map
+
+    prefs = preference_map(load(Path(VOCABULARY_USER_PATH)))
+    pref_order = {"like": 0, "dislike": 2}
+
+    def key(item: dict) -> tuple:
+        cid = (item.get("categoryId") or item.get("category_id") or "").strip()
+        val = (item.get("insertText") or item.get("insert_text") or "").strip().lower()
+        pref = prefs.get((cid, val))
+        label = (item.get("label") or val).lower()
+        return (pref_order.get(pref, 1), label, val)
+
+    return sorted(items, key=key)
 
 
 def index_stats() -> dict:

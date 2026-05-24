@@ -1,21 +1,21 @@
 {
   "schema_version": 2,
-  "enabled": true,
-  "positive": "",
-  "negative": "",
+  "enabled": false,
+  "positive": "masterpiece, best quality, amazing quality, absurdres, 1girl, solo, (mature big sister:1.25), (gentle onee-san:1.2), elegant mature woman, soft mature beauty, golden blonde hair, long golden blonde hair, side-swept hair covering one eye, green eyes, droopy eyes, voluptuous mature figure, large breasts, slim narrow waist, gently wide hips, long slender legs, off-shoulder nun outfit, black off-shoulder nun dress, long black nun skirt with side slit, golden crucifix necklace, plain background, simple background",
+  "negative": "lowres, worst quality, bad quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, bad hands, cropped, close-up, upper body, half body, multiple views, split screen, child proportions, chibi proportions, short legs, short lower body, stubby legs, thick short legs, bandy legs, disproportionate body, oversized head, massive breasts, huge breasts, exaggerated breasts, deep cleavage, high slit, exposed hips, complex background, cluttered background, black stockings, glossy skin, oily skin, prayer hands, hands together in front of chest",
   "random_groups": [
     {
       "id": "global-fd7835b1",
       "name": "丝袜",
-      "enabled": true,
+      "enabled": false,
       "target": "positive",
       "pick_mode": "random",
       "prompts": [
-        "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, (thighhighs:1.15), lace stockings, fishnet stockings, garter stockings"
+        "pantyhose, black pantyhose, white pantyhose, sheer pantyhose, glossy pantyhose, shiny pantyhose, thighhighs, lace stockings, fishnet stockings, garter stockings"
       ],
       "weights": [
-        0.0,
-        4.0,
+        1.0,
+        1.0,
         1.0,
         1.0,
         1.0,
@@ -139,6 +139,6 @@
   ],
   "merge": {
     "global_before_workflow": false,
-    "random_before_workflow": true
+    "random_before_workflow": false
   }
 }

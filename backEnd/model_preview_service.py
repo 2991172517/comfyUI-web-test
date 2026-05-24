@@ -13,6 +13,16 @@ log = logging.getLogger("custom_project.model_preview")
 VALID_FOLDERS = frozenset({"checkpoints", "loras"})
 MODELS_ROOT = COMFYUI_ROOT / "models"
 TXT_MAX_CHARS = 12_000
+MAX_UPLOAD_PREVIEW_BYTES = 15 * 1024 * 1024
+MAX_UPLOAD_FILES_PER_REQUEST = 10
+
+_MIME_TO_EXT = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 
 def models_folder_dir(folder: str) -> Path:
@@ -271,6 +281,126 @@ def delete_model_from_disk(
         "name": model_name,
         "removed_dirs": removed_dirs,
         "removed_files": removed_files,
+    }
+
+
+def _ext_from_upload(filename: str, content_type: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in MODEL_PREVIEW_EXTENSIONS:
+        return suffix
+    if content_type:
+        ct = content_type.split(";", 1)[0].strip().lower()
+        hit = _MIME_TO_EXT.get(ct)
+        if hit:
+            return hit
+    raise ValueError(
+        f"不支持的图片格式，请使用: {', '.join(sorted(MODEL_PREVIEW_EXTENSIONS))}"
+    )
+
+
+def _allocate_preview_path(asset_dir: Path, ext: str) -> Path:
+    ext = ext.lower()
+    if ext not in MODEL_PREVIEW_EXTENSIONS:
+        raise ValueError(f"不支持的图片格式: {ext}")
+    used = {p.name.lower() for p in _sorted_images_in_dir(asset_dir)}
+    for n in range(1, 1000):
+        candidate = asset_dir / f"preview_{n:02d}{ext}"
+        if candidate.name.lower() not in used:
+            return candidate
+    raise ValueError("参考图数量过多，请清理后再上传")
+
+
+def save_uploaded_previews(
+    folder: str,
+    model_name: str,
+    uploads: list[tuple[bytes, str, str | None]],
+) -> dict:
+    """将本地上传的图片写入模型同名资源目录（preview_01.png 等）。"""
+    if not uploads:
+        raise ValueError("未选择图片文件")
+    if len(uploads) > MAX_UPLOAD_FILES_PER_REQUEST:
+        raise ValueError(f"单次最多上传 {MAX_UPLOAD_FILES_PER_REQUEST} 张图片")
+
+    asset_dir = ensure_asset_dir_for_model(folder, model_name)
+    saved: list[str] = []
+
+    for data, filename, content_type in uploads:
+        if not data:
+            raise ValueError(f"文件为空: {filename or '未命名'}")
+        if len(data) > MAX_UPLOAD_PREVIEW_BYTES:
+            raise ValueError(
+                f"文件过大: {filename or '未命名'}（上限 {MAX_UPLOAD_PREVIEW_BYTES // (1024 * 1024)}MB）"
+            )
+        ext = _ext_from_upload(filename, content_type)
+        dest = _allocate_preview_path(asset_dir, ext)
+        dest.write_bytes(data)
+        saved.append(dest.name)
+        log.info("saved model preview upload %s/%s -> %s", folder, model_name, dest)
+
+    assets = get_model_assets(folder, model_name)
+    return {
+        "ok": True,
+        "folder": folder,
+        "name": model_name,
+        "saved": saved,
+        "asset_dir": asset_dir.name,
+        "previews": assets["previews"],
+        "has_preview": assets["has_preview"],
+        "summary": assets["summary"],
+        "has_summary": assets["has_summary"],
+    }
+
+
+def _preview_belongs_to_model(folder: str, model_name: str, path: Path) -> bool:
+    key = _model_key(model_name)
+    parent = _model_file_path(folder, model_name).parent
+    filename = _filename_from_key(key)
+    resolved = path.resolve()
+
+    for asset_dir in _asset_dirs_for_model(parent, filename):
+        try:
+            resolved.relative_to(asset_dir.resolve())
+            return True
+        except ValueError:
+            continue
+
+    for side in _sidecar_image_paths(parent, filename):
+        if side.resolve() == resolved:
+            return True
+    return False
+
+
+def delete_preview_for_model(folder: str, model_name: str, relative_path: str) -> dict:
+    """删除指定模型的单张参考图（资源目录内或侧挂图）。"""
+    rel = str(relative_path or "").replace("\\", "/").strip()
+    if not rel:
+        raise ValueError("缺少 relative_path")
+
+    path = resolve_preview_file(folder, rel)
+    if not path:
+        raise FileNotFoundError("预览图不存在")
+
+    if not _model_file_path(folder, model_name).is_file():
+        raise FileNotFoundError(f"模型文件不存在: {model_name}")
+
+    if not _preview_belongs_to_model(folder, model_name, path):
+        raise ValueError("该预览图不属于此模型")
+
+    removed_name = path.name
+    path.unlink()
+    log.info("deleted model preview %s/%s -> %s", folder, model_name, path)
+
+    assets = get_model_assets(folder, model_name)
+    return {
+        "ok": True,
+        "folder": folder,
+        "name": model_name,
+        "removed": removed_name,
+        "relative_path": rel,
+        "previews": assets["previews"],
+        "has_preview": assets["has_preview"],
+        "summary": assets["summary"],
+        "has_summary": assets["has_summary"],
     }
 
 

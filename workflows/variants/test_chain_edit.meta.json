@@ -38,36 +38,6 @@
     "ksampler_pass1": "5",
     "ksampler_pass2": "14",
     "save_image": "8",
-    "style_bypass_when_disabled": {
-      "node_id": "16",
-      "fallback_node_id": "17",
-      "rewire": [
-        {
-          "target_node": "4",
-          "input_key": "clip",
-          "source": [
-            "17",
-            1
-          ]
-        },
-        {
-          "target_node": "5",
-          "input_key": "model",
-          "source": [
-            "17",
-            0
-          ]
-        },
-        {
-          "target_node": "14",
-          "input_key": "model",
-          "source": [
-            "17",
-            0
-          ]
-        }
-      ]
-    },
     "future_conditioning_style": {
       "enabled": false,
       "insert_between": {

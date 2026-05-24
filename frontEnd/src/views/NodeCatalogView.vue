@@ -211,7 +211,7 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 
         <div
           v-if="activeTab === 'checkpoint' && filteredCheckpoints.length"
-          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          class="grid gap-4 items-stretch sm:grid-cols-2 xl:grid-cols-3"
         >
           <ModelNodeCard
             v-for="c in filteredCheckpoints"
@@ -241,7 +241,7 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 
         <div
           v-if="activeTab === 'lora' && filteredLoras.length"
-          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          class="grid gap-4 items-stretch sm:grid-cols-2 xl:grid-cols-3"
         >
           <ModelNodeCard
             v-for="l in filteredLoras"
@@ -261,8 +261,7 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
         </div>
 
         <p class="text-[11px] text-muted-foreground pt-2 border-t border-border">
-          删除会移除 .safetensors/.ckpt 及同名资源文件夹（含说明与预览图）。编辑说明会写入
-          <code class="text-[10px] bg-muted px-1 rounded">模型说明.txt</code>。
+          删除会移除 .safetensors/.ckpt 及同名资源文件夹（含说明与预览图）。点击卡片说明框即可编辑说明。
           「导出清单」生成
           <code class="text-[10px] bg-muted px-1 rounded">config/models_manifest.json</code>；
           「一键下载全部」按清单拉取缺失模型，本地已有则跳过（需 C 站 API Key）。

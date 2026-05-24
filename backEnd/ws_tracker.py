@@ -34,7 +34,35 @@ def clear_tracker_state(prompt_id: str) -> None:
 
 def mark_cancelled(prompt_id: str) -> None:
     """用户取消单图生成时标记状态，供 get_job_detail 立即返回 cancelled。"""
-    _update(prompt_id, status="cancelled", current_node=None, progress=None, error=None)
+    _update(
+        prompt_id,
+        status="cancelled",
+        current_node=None,
+        progress=None,
+        error=None,
+    )
+
+
+def register_prompt_watch(prompt_id: str, node_ids: list[str] | None) -> None:
+    """登记本任务中的 CLIPTextEncode 节点，供 WS 捕捉「已执行提示词阶段」。"""
+    ids = {str(n).strip() for n in (node_ids or []) if str(n).strip()}
+    _update(
+        prompt_id,
+        prompt_watch_nodes=ids,
+        prompt_stage_reached=False,
+        prompt_stage_node=None,
+    )
+
+
+def _note_executing_node(prompt_id: str, node: str) -> None:
+    with _lock:
+        entry = _states.get(prompt_id)
+        if not entry:
+            return
+        watch = entry.get("prompt_watch_nodes") or set()
+        if str(node) in watch:
+            entry["prompt_stage_reached"] = True
+            entry["prompt_stage_node"] = str(node)
 
 
 def _update(prompt_id: str, **fields: Any) -> None:
@@ -43,8 +71,13 @@ def _update(prompt_id: str, **fields: Any) -> None:
         entry.update(fields)
 
 
-def start_tracking(client_id: str, prompt_id: str) -> None:
+def start_tracking(
+    client_id: str,
+    prompt_id: str,
+    prompt_node_ids: list[str] | None = None,
+) -> None:
     """后台线程监听 ComfyUI WS，更新任务进度。"""
+    register_prompt_watch(prompt_id, prompt_node_ids)
 
     def run() -> None:
         try:
@@ -60,6 +93,8 @@ def start_tracking(client_id: str, prompt_id: str) -> None:
             progress=None,
             error=None,
         )
+        if prompt_node_ids:
+            register_prompt_watch(prompt_id, prompt_node_ids)
 
         ws = websocket.WebSocket()
         try:
@@ -99,11 +134,13 @@ def start_tracking(client_id: str, prompt_id: str) -> None:
                             current_node=None,
                         )
                         break
+                    node_str = str(node)
                     _update(
                         prompt_id,
                         status="in_progress",
-                        current_node=str(node),
+                        current_node=node_str,
                     )
+                    _note_executing_node(prompt_id, node_str)
 
                 elif msg_type == "progress":
                     if data.get("prompt_id") not in (None, prompt_id):

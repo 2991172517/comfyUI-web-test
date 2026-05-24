@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
 import { stripMutedStoredToken } from '@/lib/promptMutedTag.js'
 
 const props = defineProps({
@@ -180,7 +181,8 @@ onUnmounted(() => {
       />
     </button>
 
-    <div v-show="expanded" class="border-t border-border/50 px-2.5 py-2 space-y-1.5">
+    <AnimatedCollapse v-model="expanded">
+    <div class="border-t border-border/50 px-2.5 py-2 space-y-1.5">
       <p v-if="!tokens.length" class="text-[10px] text-muted-foreground">
         暂无词条
       </p>
@@ -240,5 +242,6 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+    </AnimatedCollapse>
   </div>
 </template>

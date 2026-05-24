@@ -7,6 +7,7 @@ const props = defineProps({
   groups: { type: Array, required: true },
   disabled: { type: Boolean, default: false },
   addLabel: { type: String, default: '+ 新建随机提示词组' },
+  gachaPreview: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:groups'])
@@ -46,6 +47,7 @@ function addGroup() {
       :group="g"
       :index="i"
       :disabled="disabled"
+      :gacha-preview="gachaPreview"
       @update:group="updateAt(i, $event)"
       @remove="removeAt(i)"
     />

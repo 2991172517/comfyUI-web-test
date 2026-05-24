@@ -1,10 +1,21 @@
 <script setup>
+import { onMounted, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
+import { tweenWidthPercent } from '@/lib/gsap/motion.js'
 
-defineProps({
+const props = defineProps({
   value: { type: Number, default: 0 },
   class: { type: String, default: '' },
 })
+
+const barRef = ref(null)
+
+function applyWidth(v) {
+  tweenWidthPercent(barRef.value, v)
+}
+
+onMounted(() => applyWidth(props.value))
+watch(() => props.value, applyWidth)
 </script>
 
 <template>
@@ -13,9 +24,6 @@ defineProps({
     :aria-valuenow="value"
     :class="cn('relative h-2 w-full overflow-hidden rounded-full bg-secondary', $props.class)"
   >
-    <div
-      class="h-full bg-primary transition-all duration-300 ease-out"
-      :style="{ width: `${Math.min(100, Math.max(0, value))}%` }"
-    />
+    <div ref="barRef" class="h-full bg-primary" style="width: 0%" />
   </div>
 </template>

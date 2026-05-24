@@ -27,6 +27,7 @@ watch(globalPromptRevision, () => {
 
 <template>
   <div
+    data-global-prompt-bar
     class="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs space-y-2"
   >
     <div class="flex flex-wrap items-center justify-between gap-2">

@@ -151,12 +151,61 @@ class SettingsBody(BaseModel):
     defaultWeight: float = Field(..., ge=0.05, le=2.0)
 
 
+class TagPreferenceBody(BaseModel):
+    categoryId: str = Field(..., min_length=1)
+    value: str = Field(..., min_length=1, max_length=512)
+    preference: str = Field(
+        default="neutral",
+        description="like | dislike | neutral（清除偏好）",
+    )
+
+
+class CategoryDeleteBody(BaseModel):
+    categoryId: str = Field(..., min_length=1)
+
+
 @router.get("/settings")
 def vocabulary_get_settings():
     try:
         return vocabulary_manager.get_settings()
     except Exception as e:
         log.exception("vocabulary get settings failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.put("/tag-preference")
+def vocabulary_set_tag_preference(body: TagPreferenceBody):
+    try:
+        return vocabulary_manager.set_prompt_preference(
+            category_id=body.categoryId,
+            value=body.value.strip(),
+            preference=body.preference,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        log.exception("vocabulary set tag preference failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.delete("/categories")
+def vocabulary_delete_category(body: CategoryDeleteBody):
+    try:
+        return vocabulary_manager.delete_category(category_id=body.categoryId)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        log.exception("vocabulary delete category failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/categories/{category_id}/count")
+def vocabulary_category_count(category_id: str):
+    try:
+        total = vocabulary_manager.category_prompt_count(category_id)
+        return {"categoryId": category_id, "total": total}
+    except Exception as e:
+        log.exception("vocabulary category count failed")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

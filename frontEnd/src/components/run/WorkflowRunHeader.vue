@@ -8,11 +8,18 @@ import Badge from '@/components/ui/Badge.vue'
 import SelectNative from '@/components/ui/SelectNative.vue'
 import Button from '@/components/ui/Button.vue'
 import ModelVisualPicker from '@/components/models/ModelVisualPicker.vue'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
 import { ChevronDown, ChevronUp } from 'lucide-vue-next'
 
 const app = useAppStore()
 const batch = useBatchStore()
 const collapsed = ref(false)
+const headerExpanded = computed({
+  get: () => !collapsed.value,
+  set: (v) => {
+    collapsed.value = !v
+  },
+})
 
 const { entry, ckptName, hasCheckpoint } = useCheckpointField()
 
@@ -85,7 +92,8 @@ onMounted(() => {
       </Button>
     </div>
 
-    <div v-show="!collapsed && hasCheckpoint" class="px-3 pb-3 pt-2">
+    <AnimatedCollapse v-model="headerExpanded">
+      <div v-if="hasCheckpoint" class="px-3 pb-3 pt-2">
       <ModelVisualPicker
         v-model="ckptName"
         folder="checkpoints"
@@ -96,6 +104,7 @@ onMounted(() => {
         :disabled="checkpointDisabled"
         :loading="app.modelsLoading"
       />
-    </div>
+      </div>
+    </AnimatedCollapse>
   </header>
 </template>

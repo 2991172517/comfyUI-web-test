@@ -1,5 +1,6 @@
 <script setup>
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { isAdmin } from '@/composables/useAuth.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
@@ -21,6 +22,7 @@ defineProps({ disabled: { type: Boolean, default: false } })
 
 const app = useAppStore()
 const batch = useBatchStore()
+const hintsOpen = ref(false)
 
 watch(
   () => [app.selectedId, app.workflowLoras],
@@ -97,13 +99,21 @@ watch(
       </CardContent>
     </Card>
 
-    <details class="rounded-lg border border-border bg-card px-4 py-3 text-sm">
-      <summary class="cursor-pointer font-medium text-primary">参数说明</summary>
-      <ul class="mt-3 space-y-2 text-muted-foreground">
-        <li v-for="(h, i) in PARAM_HINTS" :key="i">
-          <span class="font-medium text-foreground">{{ h.group }}</span> — {{ h.affects }}
-        </li>
-      </ul>
-    </details>
+    <div class="rounded-lg border border-border bg-card px-4 py-3 text-sm">
+      <button
+        type="button"
+        class="font-medium text-primary hover:underline"
+        @click="hintsOpen = !hintsOpen"
+      >
+        {{ hintsOpen ? '收起' : '展开' }}参数说明
+      </button>
+      <AnimatedCollapse v-model="hintsOpen">
+        <ul class="mt-3 space-y-2 text-muted-foreground">
+          <li v-for="(h, i) in PARAM_HINTS" :key="i">
+            <span class="font-medium text-foreground">{{ h.group }}</span> — {{ h.affects }}
+          </li>
+        </ul>
+      </AnimatedCollapse>
+    </div>
   </div>
 </template>

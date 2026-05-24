@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button.vue'
 import PromptPresetPicker from '@/components/prompt/PromptPresetPicker.vue'
 import PromptConfigEditor from '@/components/prompt/PromptConfigEditor.vue'
 import PromptPresetExportDialog from '@/components/prompt/PromptPresetExportDialog.vue'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
 
 defineProps({ disabled: { type: Boolean, default: false } })
 
@@ -20,6 +21,7 @@ const store = useAppStore()
 const exportOpen = ref(false)
 const exportSaving = ref(false)
 const importSnapshot = ref('')
+const configEditOpen = ref(true)
 
 const isDirty = computed(() => {
   if (!importSnapshot.value) return false
@@ -106,10 +108,14 @@ async function onExportConfirm({ mode, name, description }) {
           导出为预设
         </Button>
       </div>
-      <details class="group" open>
-        <summary class="cursor-pointer text-sm font-medium text-muted-foreground mb-3">
-          展开编辑固定 / 随机组
-        </summary>
+      <button
+        type="button"
+        class="text-sm font-medium text-muted-foreground hover:text-foreground mb-2"
+        @click="configEditOpen = !configEditOpen"
+      >
+        {{ configEditOpen ? '收起' : '展开' }}编辑固定 / 随机组
+      </button>
+      <AnimatedCollapse v-model="configEditOpen">
         <PromptConfigEditor
           :fixed="store.sessionPrompts.fixed"
           :random-groups="store.sessionPrompts.random_groups"
@@ -118,7 +124,7 @@ async function onExportConfirm({ mode, name, description }) {
           @update:fixed="store.sessionPrompts.fixed = $event"
           @update:random-groups="store.sessionPrompts.random_groups = $event"
         />
-      </details>
+      </AnimatedCollapse>
       <button
         type="button"
         class="text-xs text-muted-foreground underline hover:text-foreground"

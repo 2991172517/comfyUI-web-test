@@ -60,3 +60,7 @@ export function isPromptTextField(field) {
 /** 供 UI 展示的允许符号说明 */
 export const PROMPT_FORMAT_HINT =
   '支持逗号/换行分 tag、权重 (tag:1.2)、@风格触发、<|emphasis|>、| 分隔等；不支持控制字符。'
+
+/** 文本/补全模式：冒号快捷权重包装 */
+export const PROMPT_COLON_WEIGHT_HINT =
+  '在词条后按 : 可变为 (tag:) 调节权重，删除 : 取消括号包装'

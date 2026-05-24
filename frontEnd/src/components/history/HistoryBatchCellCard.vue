@@ -1,6 +1,8 @@
 <script setup>
+import { Check } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
+import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
 
 defineProps({
   cell: { type: Object, default: null },
@@ -30,28 +32,30 @@ function imageUrl(cell) {
     <template v-if="cell && imageUrl(cell)">
       <button
         type="button"
-        class="relative flex aspect-[3/4] w-full items-center justify-center bg-muted/20 p-2 hover:bg-muted/35"
-        :class="selectMode ? 'cursor-pointer' : 'cursor-zoom-in'"
+        class="relative flex aspect-[3/4] w-full cursor-zoom-in items-center justify-center bg-muted/20 p-0 hover:bg-muted/35"
+        :class="selectMode ? 'cursor-pointer' : ''"
         @click="selectMode ? emit('toggle-select') : emit('preview')"
       >
-        <img
+        <ImageMagnifierPreview
+          fill
           :src="imageUrl(cell)"
-          class="max-h-full max-w-full object-contain"
-          loading="lazy"
           :alt="cell.label"
+          :disabled="selectMode"
         />
-        <label
+        <button
           v-if="selectMode"
-          class="absolute left-1 top-1 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-border bg-background/95 shadow-sm"
-          @click.stop
+          type="button"
+          class="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 shadow-md transition-colors"
+          :class="
+            selected
+              ? 'border-violet-500 bg-violet-600 text-white'
+              : 'border-white/90 bg-background/90 text-transparent hover:border-violet-400'
+          "
+          :aria-label="selected ? '取消选择' : '选择'"
+          @click.stop="emit('toggle-select')"
         >
-          <input
-            type="checkbox"
-            class="h-3.5 w-3.5 accent-violet-600"
-            :checked="selected"
-            @change="emit('toggle-select')"
-          />
-        </label>
+          <Check class="h-4 w-4" :class="selected ? 'opacity-100' : 'opacity-0'" />
+        </button>
         <FavoriteStar
           v-if="favoritePayload && !selectMode"
           :payload="favoritePayload"
@@ -60,7 +64,10 @@ function imageUrl(cell) {
           @click.stop
         />
       </button>
-      <div class="space-y-1 border-t border-border/60 p-2 text-[10px]">
+      <div
+        class="cursor-pointer space-y-1 border-t border-border/60 p-2 text-[10px] transition-colors hover:bg-accent/40"
+        @click="emit('detail')"
+      >
         <p v-if="showAxis" class="font-medium">
           A{{ ia }}×B{{ ib }}
           <span class="font-normal text-muted-foreground">
@@ -71,7 +78,7 @@ function imageUrl(cell) {
           #{{ cell.index ?? (matrixCols ? ia * matrixCols + ib : ia * 99 + ib) }}
           <span v-if="ia != null && ib != null"> · A{{ ia }}×B{{ ib }}</span>
         </p>
-        <div class="flex flex-wrap gap-1">
+        <div class="flex flex-wrap gap-1" @click.stop>
           <Button
             variant="outline"
             size="sm"
@@ -79,14 +86,6 @@ function imageUrl(cell) {
             @click.stop="emit('save')"
           >
             保存
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-7 flex-1 min-w-[3rem] text-[10px]"
-            @click.stop="emit('detail')"
-          >
-            详情
           </Button>
           <Button
             variant="secondary"

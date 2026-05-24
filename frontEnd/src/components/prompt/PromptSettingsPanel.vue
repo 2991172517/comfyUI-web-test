@@ -75,7 +75,7 @@ onUnmounted(() => {
         class="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
       >
         <Tags class="h-3.5 w-3.5" />
-        Tag 词库管理（分类 / 增删 / 默认权重）
+        Tag 显示管理（喜好排序 / 删 tag / 删组）
       </RouterLink>
     </div>
 

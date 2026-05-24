@@ -21,6 +21,12 @@ const display = computed(() => {
   return Number(props.modelValue).toFixed(decimals)
 })
 
+const fillPercent = computed(() => {
+  const span = props.max - props.min
+  if (!span) return 0
+  return Math.max(0, Math.min(100, ((props.modelValue - props.min) / span) * 100))
+})
+
 function onInput(e) {
   emit('update:modelValue', Number(e.target.value))
 }
@@ -30,7 +36,8 @@ function onInput(e) {
   <div class="flex items-center gap-3 min-w-0">
     <input
       type="range"
-      class="slider-track h-2 flex-1 min-w-[6rem] cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+      class="slider-track h-2 flex-1 min-w-[6rem] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+      :style="{ '--slider-fill': `${fillPercent}%` }"
       :min="min"
       :max="max"
       :step="step"

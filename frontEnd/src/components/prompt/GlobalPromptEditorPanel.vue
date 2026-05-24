@@ -6,6 +6,8 @@ import { PROMPT_AUTO_SAVE_DEBOUNCE_MS, useDebouncedSave } from '@/composables/us
 import Label from '@/components/ui/Label.vue'
 import Switch from '@/components/ui/Switch.vue'
 import PromptTextarea from '@/components/prompt/PromptTextarea.vue'
+import { usePromptEditorMode } from '@/composables/usePromptEditorMode.js'
+import { PROMPT_COLON_WEIGHT_HINT } from '@/lib/promptFormatValidate.js'
 import { emptyBatchPromptConfig, globalConfigToPromptLayers } from '@/composables/usePromptConfig.js'
 import { notifyGlobalPromptSaved } from '@/composables/useGlobalPromptQuick.js'
 
@@ -14,6 +16,7 @@ defineProps({
 })
 
 const app = useAppStore()
+const { mode: promptEditorMode } = usePromptEditorMode()
 const globalCfg = ref(emptyBatchPromptConfig())
 const loading = ref(false)
 
@@ -88,6 +91,12 @@ defineExpose({ load, flush })
           />
         </div>
       </div>
+      <p
+        v-if="promptEditorMode !== 'tags'"
+        class="text-xs leading-snug text-muted-foreground"
+      >
+        {{ PROMPT_COLON_WEIGHT_HINT }}
+      </p>
 
       <div
         class="flex flex-wrap gap-4 rounded-md border border-border/70 bg-muted/15 p-3 text-xs"

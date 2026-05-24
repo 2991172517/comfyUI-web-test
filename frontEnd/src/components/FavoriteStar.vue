@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Star } from 'lucide-vue-next'
 import { useFavorites } from '@/composables/useFavorites.js'
+import { playFavoriteBurst } from '@/lib/gsap/favoriteBurst.js'
 import { cn } from '@/lib/utils'
 
 const props = defineProps({
@@ -13,6 +14,7 @@ const emit = defineEmits(['toggled'])
 
 const { isFavorited, toggleFavorite } = useFavorites()
 const busy = ref(false)
+const btnRef = ref(null)
 
 async function onClick(e) {
   e?.stopPropagation?.()
@@ -20,6 +22,10 @@ async function onClick(e) {
   busy.value = true
   try {
     const res = await toggleFavorite(props.payload)
+    const nowFav = isFavorited(props.payload)
+    if (btnRef.value) {
+      playFavoriteBurst(btnRef.value, { favorited: nowFav })
+    }
     emit('toggled', res)
   } finally {
     busy.value = false
@@ -29,6 +35,7 @@ async function onClick(e) {
 
 <template>
   <button
+    ref="btnRef"
     type="button"
     :title="isFavorited(payload) ? '取消收藏' : '收藏参数'"
     :disabled="busy"

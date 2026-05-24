@@ -18,6 +18,10 @@ export function createHistoryStore() {
   const batchDetail = ref(null)
   const singleDetail = ref(null)
   const detailLoading = ref(false)
+  /** @type {import('vue').Ref<Set<string>>} */
+  const selectedKeys = ref(new Set())
+  const bulkSelectMode = ref(false)
+  const bulkDeleting = ref(false)
 
   async function loadFilterOptions() {
     try {
@@ -79,7 +83,7 @@ export function createHistoryStore() {
     }
   }
 
-  function clearSelection() {
+  function clearDetailSelection() {
     selected.value = null
     batchDetail.value = null
     singleDetail.value = null
@@ -88,7 +92,7 @@ export function createHistoryStore() {
   async function deleteSingle(promptId) {
     await api.deleteHistorySingle(promptId)
     if (selected.value?.prompt_id === promptId || selected.value?.id === promptId) {
-      clearSelection()
+      clearDetailSelection()
     }
     await refresh()
   }
@@ -96,7 +100,7 @@ export function createHistoryStore() {
   async function deleteBatch(batchId) {
     await api.deleteHistoryBatch(batchId)
     if (selected.value?.batch_id === batchId || selected.value?.id === batchId) {
-      clearSelection()
+      clearDetailSelection()
     }
     await refresh()
   }
@@ -111,6 +115,78 @@ export function createHistoryStore() {
     return res
   }
 
+  function recordKey(rec) {
+    if (!rec) return ''
+    if (rec.type === 'batch') return `batch:${rec.batch_id || rec.id}`
+    return `single:${rec.prompt_id || rec.id}`
+  }
+
+  function isSelected(rec) {
+    return selectedKeys.value.has(recordKey(rec))
+  }
+
+  function toggleSelect(rec) {
+    const key = recordKey(rec)
+    if (!key) return
+    const next = new Set(selectedKeys.value)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    selectedKeys.value = next
+  }
+
+  function selectAllVisible() {
+    selectedKeys.value = new Set(records.value.map((r) => recordKey(r)).filter(Boolean))
+  }
+
+  function clearBulkSelection() {
+    selectedKeys.value = new Set()
+  }
+
+  function toggleBulkSelectMode() {
+    bulkSelectMode.value = !bulkSelectMode.value
+    if (!bulkSelectMode.value) clearBulkSelection()
+  }
+
+  function exitBulkSelectMode() {
+    bulkSelectMode.value = false
+    clearBulkSelection()
+  }
+
+  async function deleteSelected() {
+    const singles = []
+    const batches = []
+    for (const rec of records.value) {
+      if (!isSelected(rec)) continue
+      if (rec.type === 'batch') batches.push(rec.batch_id || rec.id)
+      else singles.push(rec.prompt_id || rec.id)
+    }
+    if (!singles.length && !batches.length) {
+      return { ok: false, message: '请先勾选要删除的记录' }
+    }
+    bulkDeleting.value = true
+    try {
+      const res = await api.deleteHistoryBulk({ singles, batches })
+      const n = (res.deleted_singles?.length || 0) + (res.deleted_batches?.length || 0)
+      const failN = res.failed?.length || 0
+      if (selected.value && isSelected(selected.value)) {
+        clearDetailSelection()
+      }
+      clearBulkSelection()
+      bulkSelectMode.value = false
+      await refresh()
+      return {
+        ok: true,
+        message:
+          failN > 0
+            ? `已删除 ${n} 条，${failN} 条失败`
+            : `已删除 ${n} 条记录`,
+        result: res,
+      }
+    } finally {
+      bulkDeleting.value = false
+    }
+  }
+
   const store = reactive({
     records,
     loading,
@@ -120,15 +196,27 @@ export function createHistoryStore() {
     batchDetail,
     singleDetail,
     detailLoading,
+    selectedKeys,
+    bulkSelectMode,
+    bulkDeleting,
     refresh,
     loadFilterOptions,
     resetFilters,
     selectRecord,
-    clearSelection,
+    clearDetailSelection,
+    clearSelection: clearDetailSelection,
     loraWeightsForName,
     deleteSingle,
     deleteBatch,
     deleteBatchItems,
+    recordKey,
+    isSelected,
+    toggleSelect,
+    selectAllVisible,
+    clearBulkSelection,
+    toggleBulkSelectMode,
+    exitBulkSelectMode,
+    deleteSelected,
   })
 
   provide(HISTORY_STORE, store)

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "template_id": "First_api",
+  "is_master": false,
+  "display_name": "default_api",
+  "style_enabled_default": false,
+  "topology": {
+    "lora_slots": [],
+    "future_conditioning_style": {
+      "enabled": false
+    },
+    "positive_encode": {
+      "clip_source_node": "2"
+    },
+    "negative_encode": {
+      "clip_source_node": "2"
+    }
+  },
+  "style_enabled": false
+}

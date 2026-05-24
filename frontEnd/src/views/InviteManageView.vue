@@ -13,8 +13,10 @@ import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
 import Badge from '@/components/ui/Badge.vue'
 import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const app = useAppStore()
+const { confirmDelete } = useConfirmDialog()
 const invites = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -128,7 +130,7 @@ async function resetUsage(row) {
 }
 
 async function remove(row) {
-  if (!confirm(`删除邀请码「${row.code}」？`)) return
+  if (!(await confirmDelete({ message: `删除邀请码「${row.code}」？` }))) return
   try {
     await api.deleteInvite(row.id)
     app.setMessage('已删除')

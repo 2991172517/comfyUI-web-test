@@ -91,6 +91,34 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  deleteWorkflowVariant: (workflowId) =>
+    request(`/api/workflow-variants/${wfPath(workflowId)}`, { method: 'DELETE' }),
+  analyzeWorkflowImport: async (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/workflow-import/analyze', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || res.statusText)
+    return data
+  },
+  importWorkflow: async (file, { variant_id, display_name } = {}) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    if (variant_id) fd.append('variant_id', variant_id)
+    if (display_name) fd.append('display_name', display_name)
+    const res = await fetch('/api/workflow-import', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || res.statusText)
+    return data
+  },
   updateWorkflowMeta: (workflowId, body) =>
     request(`/api/workflows/${wfPath(workflowId)}/meta`, {
       method: 'PUT',
@@ -264,6 +292,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ indices }),
     }),
+  deleteHistoryBulk: ({ singles = [], batches = [] } = {}) =>
+    request('/api/history/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ singles, batches }),
+    }),
   listBatches: (limit = 50, taskId = null) => {
     const q = new URLSearchParams({ limit: String(limit) })
     if (taskId) q.set('task_id', taskId)
@@ -278,6 +311,26 @@ export const api = {
     request(`/api/models/${folder}${withPreviews ? '?with_previews=1' : ''}`),
   getModelPreviews: (folder, name) =>
     request(`/api/models/${folder}/previews?name=${encodeURIComponent(name)}`),
+  uploadModelPreviews: async (folder, name, fileList) => {
+    const fd = new FormData()
+    fd.append('name', name)
+    for (const file of fileList) {
+      fd.append('files', file)
+    }
+    const res = await fetch(`/api/models/${folder}/previews`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || res.statusText)
+    return data
+  },
+  removeModelPreview: (folder, name, relativePath) =>
+    request(`/api/models/${folder}/previews/remove`, {
+      method: 'POST',
+      body: JSON.stringify({ name, relative_path: relativePath }),
+    }),
   saveModelDescription: (folder, body) =>
     request(`/api/models/${folder}/description`, {
       method: 'PUT',
@@ -450,6 +503,18 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ defaultWeight }),
     }),
+  vocabularySetTagPreference: (body) =>
+    request('/api/vocabulary/tag-preference', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  vocabularyDeleteCategory: (categoryId) =>
+    request('/api/vocabulary/categories', {
+      method: 'DELETE',
+      body: JSON.stringify({ categoryId }),
+    }),
+  vocabularyCategoryCount: (categoryId) =>
+    request(`/api/vocabulary/categories/${encodeURIComponent(categoryId)}/count`),
   sleep,
 }
 

@@ -7,6 +7,10 @@ from config import COMFYUI_ROOT
 import comfy_client
 import ws_tracker
 
+import logging
+
+log = logging.getLogger(__name__)
+
 OUTPUT_DIR = COMFYUI_ROOT / "output"
 TEMP_DIR = COMFYUI_ROOT / "temp"
 INPUT_DIR = COMFYUI_ROOT / "input"
@@ -85,6 +89,12 @@ def cancel_job(prompt_id: str) -> dict:
     except RuntimeError:
         pass
     ws_tracker.mark_cancelled(pid)
+    try:
+        import history_service
+
+        history_service.abandon_single_record(pid)
+    except Exception as exc:
+        log.warning("cancel cleanup history %s: %s", pid, exc)
     return {"ok": True, "prompt_id": pid, "status": "cancelled"}
 
 
@@ -116,6 +126,8 @@ def _build_job_response(prompt_id: str, tracked: dict, job: dict | None) -> dict
             "message": "任务已取消",
             "current_node": None,
             "progress": None,
+            "prompt_stage_reached": bool(tracked.get("prompt_stage_reached")),
+            "prompt_stage_node": tracked.get("prompt_stage_node"),
             "preview_output": (job or {}).get("preview_output"),
             "outputs_count": (job or {}).get("outputs_count", 0),
             "execution_error": (job or {}).get("execution_error"),
@@ -156,6 +168,8 @@ def _build_job_response(prompt_id: str, tracked: dict, job: dict | None) -> dict
         "message": message,
         "current_node": tracked.get("current_node"),
         "progress": tracked.get("progress"),
+        "prompt_stage_reached": bool(tracked.get("prompt_stage_reached")),
+        "prompt_stage_node": tracked.get("prompt_stage_node"),
         "preview_output": (job or {}).get("preview_output"),
         "outputs_count": (job or {}).get("outputs_count", 0),
         "execution_error": (job or {}).get("execution_error"),
@@ -180,6 +194,15 @@ def delete_job_outputs(prompt_id: str, images: list[dict] | None = None) -> dict
         comfy_client.delete_history(prompt_id)
     except RuntimeError:
         pass
+
+    try:
+        import history_service
+
+        rec_path = history_service._record_path(prompt_id)
+        if rec_path.is_file() or history_service._single_dir(prompt_id).is_dir():
+            history_service.delete_single_record(prompt_id)
+    except Exception as exc:
+        log.warning("cleanup single history after delete outputs %s: %s", prompt_id, exc)
 
     return {
         "ok": True,

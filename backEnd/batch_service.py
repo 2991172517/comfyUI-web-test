@@ -624,6 +624,7 @@ def run_batch(workflow_id: str, body: dict) -> None:
         for item in items:
             if batch_store.is_cancelled(batch_id):
                 batch_store.update(batch_id, status="cancelled")
+                _purge_abandoned_batch(batch_id, manifest_items)
                 return
 
             batch_store.update(
@@ -700,6 +701,7 @@ def run_batch(workflow_id: str, body: dict) -> None:
             except RuntimeError as exc:
                 if "取消" in str(exc):
                     batch_store.update(batch_id, status="cancelled")
+                    _purge_abandoned_batch(batch_id, manifest_items)
                     return
                 entry = {
                     **item,
@@ -1012,6 +1014,16 @@ def _summary_from_manifest(manifest: dict, batch_id: str) -> dict:
     }
 
 
+def _batch_visible_in_history(summary: dict) -> bool:
+    status = str(summary.get("status") or "")
+    completed = int(summary.get("completed") or 0)
+    if status == "cancelled" and completed <= 0 and not summary.get("thumbnail_url"):
+        return False
+    if status == "deleted":
+        return False
+    return True
+
+
 def list_batches(limit: int = 50, *, task_id: str | None = None) -> list[dict]:
     root = OUTPUT_DIR / BATCH_OUTPUT_PREFIX
     if not root.is_dir():
@@ -1031,9 +1043,10 @@ def list_batches(limit: int = 50, *, task_id: str | None = None) -> list[dict]:
                 rc = _read_run_config(d.name) or {}
                 rec["task_id"] = rc.get("task_id")
                 rec["task_name"] = rc.get("task_name")
-            records.append(rec)
+            if _batch_visible_in_history(rec):
+                records.append(rec)
         else:
-            records.append({
+            orphan = {
                 "batch_id": d.name,
                 "workflow_id": None,
                 "status": "unknown",
@@ -1046,7 +1059,9 @@ def list_batches(limit: int = 50, *, task_id: str | None = None) -> list[dict]:
                 "total": 0,
                 "thumbnail_url": None,
                 "output_dir": f"{BATCH_OUTPUT_PREFIX}/{d.name}",
-            })
+            }
+            if _batch_visible_in_history(orphan):
+                records.append(orphan)
         if len(records) >= limit:
             break
     return records
@@ -1161,6 +1176,28 @@ def delete_batch_items(batch_id: str, indices: list[int]) -> dict:
         "remaining": len(remaining),
         "deleted_files": deleted_files,
     }
+
+
+def _batch_has_output_images(items: list[dict] | None) -> bool:
+    for it in items or []:
+        if it.get("images"):
+            return True
+    return False
+
+
+def _purge_abandoned_batch(batch_id: str, items: list[dict] | None = None) -> None:
+    """取消且无任何成图时移除批量目录，避免出现在历史中。"""
+    manifest = _read_manifest(batch_id)
+    pool = items if items is not None else (manifest or {}).get("items") or []
+    if _batch_has_output_images(pool):
+        return
+    try:
+        import history_service
+
+        history_service.delete_batch_record(batch_id)
+        log.info("已清理取消的批量目录 batch_id=%s", batch_id)
+    except Exception as exc:
+        log.warning("purge abandoned batch %s: %s", batch_id, exc)
 
 
 def delete_batch(batch_id: str) -> dict:

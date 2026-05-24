@@ -13,6 +13,7 @@ import {
   resolveRestoreWorkflowId,
   WORKFLOW_TEMPLATE_ID,
 } from '@/lib/workflowRestore.js'
+import { getConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const APP_STORE = Symbol('appStore')
 
@@ -521,12 +522,17 @@ export function createAppStore() {
 
   async function deleteOutputs() {
     if (!job.promptId || !job.images.length) return false
-    if (!confirm('确定删除服务器上本次生成的图片？')) return false
+    if (
+      !(await getConfirmDialog().confirmDelete({
+        message: '确定删除本次生成的图片？相关历史记录将一并移除。',
+      }))
+    )
+      return false
     loading.value = true
     try {
       await api.deleteJobOutputs(job.promptId, job.images)
       job.images = []
-      setMessage('已删除服务器输出')
+      setMessage('已删除生成结果与历史记录')
       return true
     } catch (e) {
       setMessage(e.message, true)
@@ -614,6 +620,7 @@ export function createAppStore() {
     applyFavorite,
     applyWorkflowSnapshot,
     saveWorkflow,
+    applyJobDetail,
     queueWorkflow,
     cancelWorkflow,
     deleteOutputs,

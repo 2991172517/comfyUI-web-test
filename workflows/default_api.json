@@ -23,13 +23,21 @@
       "sampler_name": "euler",
       "scheduler": "normal",
       "seed": 8566257,
-      "steps": 20
+      "steps": 20,
+      "clip": [
+        "2",
+        0
+      ]
     }
   },
   "4": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "v1-5-pruned-emaonly.safetensors"
+      "ckpt_name": "v1-5-pruned-emaonly.safetensors",
+      "clip": [
+        "2",
+        0
+      ]
     }
   },
   "5": {
@@ -37,7 +45,11 @@
     "inputs": {
       "batch_size": 1,
       "height": 512,
-      "width": 512
+      "width": 512,
+      "model": [
+        "1",
+        0
+      ]
     }
   },
   "6": {

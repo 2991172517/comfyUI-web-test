@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
-import { useRoute, RouterLink, RouterView } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
+import AnimatedRouterView from '@/components/layout/AnimatedRouterView.vue'
 import {
   Sparkles,
   History,
@@ -24,8 +25,15 @@ import QuickNavFab from '@/components/layout/QuickNavFab.vue'
 import UserMenu from '@/components/layout/UserMenu.vue'
 import GlobalPromptSettingsModal from '@/components/prompt/GlobalPromptSettingsModal.vue'
 import ModelImportModal from '@/components/models/ModelImportModal.vue'
+import ConfirmDialogHost from '@/components/ui/ConfirmDialogHost.vue'
+import RandomGachaHost from '@/components/effects/RandomGachaHost.vue'
+import FireflyEcosystemBackground from '@/components/background/FireflyEcosystemBackground.vue'
+import { provideConfirmDialog } from '@/composables/useConfirmDialog.js'
+import { provideRandomGachaOverlay } from '@/composables/useRandomGachaOverlay.js'
 import { cn } from '@/lib/utils'
 
+provideConfirmDialog()
+provideRandomGachaOverlay()
 const app = createAppStore()
 const batch = createBatchStore(app)
 const history = createHistoryStore()
@@ -70,7 +78,7 @@ const nav = computed(() => {
     { to: '/history', label: '历史记录', icon: History },
     { to: '/favorites', label: '收藏', icon: Star },
     { to: '/models', label: '模型管理', icon: Boxes },
-    { to: '/settings/tags', label: 'Tag 词库管理', icon: Tags },
+    { to: '/settings/tags', label: 'Tag 显示管理', icon: Tags },
   ]
   if (isAdmin()) {
     items.push({ to: '/admin/invites', label: '邀请码管理', icon: KeyRound })
@@ -91,9 +99,12 @@ const isFullBleed = computed(() => !!route.meta?.fullBleed)
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-background">
+  <div class="relative min-h-screen">
+    <FireflyEcosystemBackground variant="ambient" :intensity="0.6" :show-controls="false" />
+
+    <div class="relative z-10 flex min-h-screen flex-col bg-background/86 backdrop-blur-[1px]">
     <header
-      class="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80"
+      class="sticky top-0 z-50 border-b border-border bg-card/92 backdrop-blur supports-[backdrop-filter]:bg-card/78"
     >
       <div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <RouterLink to="/generate" class="flex shrink-0 items-center gap-2">
@@ -150,11 +161,14 @@ const isFullBleed = computed(() => !!route.meta?.fullBleed)
         <h1 class="text-2xl font-semibold tracking-tight">{{ pageTitle }}</h1>
         <p v-if="pageDesc" class="mt-1 text-sm text-muted-foreground max-w-3xl">{{ pageDesc }}</p>
       </div>
-      <RouterView />
+      <AnimatedRouterView />
     </main>
 
     <QuickNavFab />
     <GlobalPromptSettingsModal />
     <ModelImportModal />
+    <ConfirmDialogHost />
+    <RandomGachaHost />
+    </div>
   </div>
 </template>

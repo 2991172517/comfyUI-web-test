@@ -44,9 +44,10 @@ async function openFromQuery() {
   await history.selectRecord(rec)
 }
 
-function onPreviewSingle(rec) {
+function onPreviewImage(rec) {
   const url = rec.thumbnail_url || rec.images?.[0]?.url
-  if (url) feedLightbox.value?.openOne(url, rec.prompt_id)
+  const label = rec.type === 'batch' ? rec.batch_id : rec.prompt_id
+  if (url) feedLightbox.value?.openOne(url, label)
 }
 
 function onPreviewSingleDetail(url) {
@@ -92,13 +93,13 @@ watch(
 </script>
 
 <template>
-  <div class="flex w-full min-h-0 flex-col gap-4">
+  <div class="flex w-full min-h-0 flex-col gap-4" data-route-stagger>
     <PageAlert />
 
     <!-- 列表视图：时间线卡片 -->
     <template v-if="!inDetail">
       <HistoryFilters />
-      <HistoryFeed @preview-single="onPreviewSingle" />
+      <HistoryFeed @preview-image="onPreviewImage" />
     </template>
 
     <!-- 详情视图：整页切换，不再在列表下方展开 -->

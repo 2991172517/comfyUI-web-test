@@ -1,9 +1,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { Dices } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
+import { getRandomGachaOverlay } from '@/composables/useRandomGachaOverlay.js'
+import { simulateGachaRowsForGroups } from '@/lib/randomGachaReels.js'
 import { PROMPT_AUTO_SAVE_DEBOUNCE_MS, useDebouncedSave } from '@/composables/useDebouncedSave.js'
 import Switch from '@/components/ui/Switch.vue'
+import Button from '@/components/ui/Button.vue'
 import PromptRandomGroupList from '@/components/prompt/PromptRandomGroupList.vue'
 import {
   applyGlobalRandomGroupsMaster,
@@ -17,6 +21,7 @@ const app = useAppStore()
 const randomGroups = ref([])
 const loading = ref(false)
 const masterSaving = ref(false)
+const simulating = ref(false)
 let cachedBase = null
 let randomGroupSnapshot = null
 
@@ -93,6 +98,30 @@ async function setMasterEnabled(enabled) {
 
 onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 
+async function simulateAllGroups() {
+  if (simulating.value || loading.value) return
+  const enabled = randomGroups.value.filter(
+    (g) => g?.enabled !== false && (g.prompts || []).some((p) => String(p).trim()),
+  )
+  if (!enabled.length) {
+    app.setMessage('没有可抽取的随机组，请先添加并启用词条', true)
+    return
+  }
+  simulating.value = true
+  try {
+    const rows = simulateGachaRowsForGroups(enabled)
+    await getRandomGachaOverlay().playWithRows(rows, {
+      title: '模拟抽词',
+      subtitle: `预览 ${rows.length} 个全局随机组（不影响实际生成）`,
+      manualClose: true,
+    })
+  } catch (e) {
+    app.setMessage(e.message, true)
+  } finally {
+    simulating.value = false
+  }
+}
+
 defineExpose({ load, flush })
 </script>
 
@@ -111,6 +140,17 @@ defineExpose({ load, flush })
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-8 gap-1.5 px-2.5"
+          :disabled="loading || simulating || randomSummary.text === '无随机组'"
+          title="模拟抽取全部已启用随机组"
+          @click="simulateAllGroups"
+        >
+          <Dices class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ simulating ? '抽取中…' : '模拟抽词' }}</span>
+        </Button>
         <Switch
           :model-value="masterEnabled"
           :disabled="loading || masterSaving || saving || randomSummary.text === '无随机组'"
@@ -132,6 +172,7 @@ defineExpose({ load, flush })
     <p v-if="loading" class="text-sm text-muted-foreground">加载中…</p>
     <PromptRandomGroupList
       v-else
+      gacha-preview
       :groups="randomGroups"
       @update:groups="randomGroups = $event"
     />

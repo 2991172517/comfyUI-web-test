@@ -1,11 +1,12 @@
 import logging
 import os
+import sys
 import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -19,7 +20,17 @@ import model_preview_service
 import model_folder_service
 import workflow_service
 import ws_tracker
-from config import API_HOST, API_PORT, COMFYUI_URL, WORKFLOW_TEMPLATE_ID, WORKFLOWS_DIR
+from config import (
+    API_HOST,
+    API_PORT,
+    COMFYUI_URL,
+    FRONTEND_DIST_DIR,
+    PROJECT_ROOT,
+    WORKFLOW_TEMPLATE_ID,
+    WORKFLOWS_DIR,
+    ensure_runtime_dirs,
+    should_serve_frontend,
+)
 import prompt_defaults_service
 import batch_prompt_service
 import batch_task_service
@@ -33,6 +44,7 @@ import campaign_service
 import prompt_preset_service
 import workflow_chain_service
 import workflow_meta_service
+import workflow_import_service
 from logging_config import setup_logging
 from routers.model_sources import router as model_sources_router
 from routers.model_manifest import router as model_manifest_router
@@ -50,6 +62,7 @@ app.include_router(vocabulary_router)
 @app.on_event("startup")
 def _warm_vocabulary_index() -> None:
     """后台预热词库索引（首次或 manifest 变更时构建）。"""
+    ensure_runtime_dirs()
     import vocabulary as vocabulary_service
 
     def _run() -> None:
@@ -135,7 +148,7 @@ async def require_auth_middleware(request: Request, call_next):
 
 
 class CreateVariantBody(BaseModel):
-    variant_id: str
+    variant_id: str | None = None
     display_name: str | None = None
 
 
@@ -300,6 +313,11 @@ class OverridesBody(BaseModel):
 
 class DeleteBatchItemsBody(BaseModel):
     indices: list[int] = []
+
+
+class BulkDeleteHistoryBody(BaseModel):
+    singles: list[str] = []
+    batches: list[str] = []
 
 
 class CampaignTaskBody(BaseModel):
@@ -510,6 +528,56 @@ def api_create_workflow_variant(body: CreateVariantBody, request: Request):
             body.display_name,
         )
         return {"ok": True, **entry}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/workflow-import/analyze")
+async def api_analyze_workflow_import(
+    request: Request,
+    file: UploadFile = File(...),
+):
+    _forbid_invite_workflow_config(request)
+    raw = await file.read()
+    try:
+        result = workflow_import_service.analyze_import_file(
+            raw, filename=file.filename or "",
+        )
+        return {"ok": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/workflow-import")
+async def api_import_workflow(
+    request: Request,
+    file: UploadFile = File(...),
+    variant_id: str | None = Form(None),
+    display_name: str | None = Form(None),
+):
+    _forbid_invite_workflow_config(request)
+    raw = await file.read()
+    try:
+        entry = workflow_import_service.import_as_variant(
+            raw,
+            variant_id=(variant_id or "").strip() or None,
+            display_name=(display_name or "").strip() or None,
+            filename=file.filename or "",
+        )
+        return {"ok": True, **entry}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.delete("/api/workflow-variants/{variant_id:path}")
+def api_delete_workflow_variant(variant_id: str, request: Request):
+    _forbid_invite_workflow_config(request)
+    wid = variant_id if variant_id.startswith("variants/") else f"variants/{variant_id}"
+    try:
+        entry = workflow_import_service.delete_variant(wid)
+        return {"ok": True, **entry}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -850,6 +918,26 @@ def api_save_workflow(workflow_id: str, body: OverridesBody, request: Request):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+def _prompt_encode_node_ids(prompt: dict, encode_map: dict) -> list[str]:
+    """提交给 ComfyUI 的 CLIPTextEncode 节点 id，用于 WS 捕捉提示词执行阶段。"""
+    seen: set[str] = set()
+    out: list[str] = []
+    for nid in (encode_map or {}).values():
+        s = str(nid).strip()
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    for nid, node in (prompt or {}).items():
+        if not isinstance(node, dict):
+            continue
+        if str(node.get("class_type") or "") == "CLIPTextEncode":
+            s = str(nid).strip()
+            if s and s not in seen:
+                seen.add(s)
+                out.append(s)
+    return out
+
+
 @app.post("/api/workflows/{workflow_id:path}/queue")
 def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
     _require_single_quota(request)
@@ -917,7 +1005,8 @@ def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
         )
         result = comfy_client.queue_prompt(prompt, client_id=client_id, prompt_id=prompt_id)
         pid = result.get("prompt_id", prompt_id)
-        ws_tracker.start_tracking(client_id, pid)
+        watch_nodes = _prompt_encode_node_ids(prompt, encode_map)
+        ws_tracker.start_tracking(client_id, pid, prompt_node_ids=watch_nodes)
         history_service.persist_single_queued(
             prompt_id=pid,
             workflow_id=workflow_id,
@@ -1172,6 +1261,21 @@ def api_delete_history_batch_items(batch_id: str, body: DeleteBatchItemsBody):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+@app.post("/api/history/bulk-delete")
+def api_bulk_delete_history(body: BulkDeleteHistoryBody):
+    import history_service
+
+    if not body.singles and not body.batches:
+        raise HTTPException(status_code=400, detail="未选择任何记录")
+    result = history_service.bulk_delete_records(
+        singles=body.singles,
+        batches=body.batches,
+    )
+    if result.get("failed") and not result.get("deleted_singles") and not result.get("deleted_batches"):
+        raise HTTPException(status_code=400, detail=result["failed"][0].get("error", "删除失败"))
+    return result
+
+
 @app.get("/api/batches")
 def api_list_batches(
     limit: int = Query(50, ge=1, le=200),
@@ -1340,6 +1444,11 @@ class ModelDescriptionBody(BaseModel):
     source_url: str = ""
 
 
+class ModelPreviewRemoveBody(BaseModel):
+    name: str = ""
+    relative_path: str = ""
+
+
 @app.put("/api/models/{folder}/description")
 def api_save_model_description(folder: str, body: ModelDescriptionBody):
     folder = str(folder or "").strip().lower()
@@ -1382,6 +1491,59 @@ def api_delete_model_item(
         return result
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"删除失败: {e}") from e
+
+
+@app.post("/api/models/{folder}/previews")
+async def api_upload_model_previews(
+    folder: str,
+    name: str = Form(..., description="模型文件名"),
+    files: list[UploadFile] = File(..., description="参考图，可多选"),
+):
+    folder = str(folder or "").strip().lower()
+    model_name = str(name or "").strip()
+    if folder not in ("checkpoints", "loras"):
+        raise HTTPException(status_code=400, detail="folder 须为 checkpoints 或 loras")
+    if not model_name:
+        raise HTTPException(status_code=400, detail="缺少模型文件名 name")
+    if not files:
+        raise HTTPException(status_code=400, detail="请选择至少一张图片")
+    uploads: list[tuple[bytes, str, str | None]] = []
+    try:
+        for uf in files:
+            raw = await uf.read()
+            uploads.append((raw, uf.filename or "", uf.content_type))
+        return model_preview_service.save_uploaded_previews(folder, model_name, uploads)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}") from e
+
+
+@app.post("/api/models/{folder}/previews/remove")
+def api_remove_model_preview(folder: str, body: ModelPreviewRemoveBody):
+    folder = str(folder or "").strip().lower()
+    model_name = str(body.name or "").strip()
+    relative_path = str(body.relative_path or "").strip()
+    if folder not in ("checkpoints", "loras"):
+        raise HTTPException(status_code=400, detail="folder 须为 checkpoints 或 loras")
+    if not model_name:
+        raise HTTPException(status_code=400, detail="缺少模型文件名 name")
+    if not relative_path:
+        raise HTTPException(status_code=400, detail="缺少 relative_path")
+    try:
+        return model_preview_service.delete_preview_for_model(
+            folder,
+            model_name,
+            relative_path,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {e}") from e
 
@@ -1529,11 +1691,49 @@ def api_cancel_campaign(campaign_id: str):
     return campaign_service.cancel_campaign(campaign_id)
 
 
+def _mount_frontend_static() -> None:
+    if not should_serve_frontend():
+        return
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    dist = FRONTEND_DIST_DIR
+    index = dist / "index.html"
+    if not index.is_file():
+        log.warning("SERVE_FRONTEND 已启用但未找到 %s", index)
+        return
+
+    @app.get("/", include_in_schema=False)
+    async def spa_root():
+        return FileResponse(index)
+
+    # 挂载在 API 路由之后；html=True 支持 Vue history 刷新
+    app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")
+    log.info("已托管前端静态页：%s", dist)
+
+
+_mount_frontend_static()
+
+
 if __name__ == "__main__":
+    import multiprocessing
+
     import uvicorn
+
+    multiprocessing.freeze_support()
 
     # 热重载会清空内存中的 batch_store，开发时易误判「任务不存在」
     use_reload = os.getenv("API_RELOAD", "").strip().lower() in ("1", "true", "yes")
-    if use_reload:
+    if use_reload and not getattr(sys, "frozen", False):
         log.warning("API_RELOAD=1：修改代码会重启进程，进行中的批量状态会丢失")
-    uvicorn.run("main:app", host=API_HOST, port=API_PORT, reload=use_reload)
+        uvicorn.run("main:app", host=API_HOST, port=API_PORT, reload=True)
+    else:
+        if getattr(sys, "frozen", False):
+            log.info(
+                "CustomProject API (exe) · ComfyUI=%s · project=%s · http://%s:%s",
+                COMFYUI_URL,
+                PROJECT_ROOT,
+                API_HOST,
+                API_PORT,
+            )
+        uvicorn.run(app, host=API_HOST, port=API_PORT)

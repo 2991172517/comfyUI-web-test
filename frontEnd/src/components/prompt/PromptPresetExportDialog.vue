@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, toRef, watch } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
@@ -18,6 +19,9 @@ const emit = defineEmits(['update:open', 'confirm'])
 const step = ref('choose')
 const newName = ref('')
 const description = ref('')
+const backdropRef = ref(null)
+const panelRef = ref(null)
+useModalMotion(toRef(() => props.open), backdropRef, panelRef)
 
 watch(
   () => props.open,
@@ -64,10 +68,12 @@ function confirmCreate() {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="backdropRef"
       class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
       @click.self="close"
     >
       <div
+        ref="panelRef"
         role="dialog"
         aria-modal="true"
         class="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg space-y-4"

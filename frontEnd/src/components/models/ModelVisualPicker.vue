@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, toRef } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
+import { staggerReveal } from '@/lib/gsap/motion.js'
 import { ImageOff, Search } from 'lucide-vue-next'
 import Label from '@/components/ui/Label.vue'
 import Input from '@/components/ui/Input.vue'
@@ -8,6 +10,7 @@ import Badge from '@/components/ui/Badge.vue'
 import { useModelAssets } from '@/composables/useModelAssets.js'
 import { splitSourceUrl } from '@/lib/modelDescription.js'
 import { catalogThumb, modelDisplayTitle } from '@/lib/modelDisplay.js'
+import ModelDescriptionText from '@/components/models/ModelDescriptionText.vue'
 import { cn } from '@/lib/utils'
 
 const FOLDER_META = {
@@ -37,15 +40,35 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   /** loras 目录：loraName -> recommended | not_recommended | neutral */
   loraCompatMap: { type: Object, default: null },
+  /** 为 false 时不显示顶部 Label（如 LoRA 卡片内嵌） */
+  showLabel: { type: Boolean, default: true },
+  /** 外层容器 class，如 h-full */
+  blockClass: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
+
+const PREVIEW_IMAGE_SIZE = 'h-28 w-28'
+const PREVIEW_INFO_HEIGHT = 'h-28'
+
+const stretchFill = computed(() => props.blockClass.includes('h-full'))
 
 const meta = computed(() => FOLDER_META[props.folder] || FOLDER_META.loras)
 const displayLabel = computed(() => props.label || meta.value.defaultLabel)
 
 const open = ref(false)
 const query = ref('')
+const backdropRef = ref(null)
+const panelRef = ref(null)
+
+useModalMotion(open, backdropRef, panelRef)
+
+watch(open, async (v) => {
+  if (!v) return
+  await nextTick()
+  const cards = panelRef.value?.querySelectorAll('[data-picker-card]')
+  if (cards?.length) staggerReveal(cards, { stagger: 0.03 })
+})
 
 const catalogMap = computed(() => {
   const m = new Map()
@@ -139,8 +162,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="space-y-2">
-    <Label v-if="displayLabel">{{ displayLabel }}</Label>
+  <div :class="cn('space-y-2', blockClass, stretchFill && 'flex flex-col')">
+    <Label v-if="showLabel && displayLabel">{{ displayLabel }}</Label>
 
     <div
       v-if="modelValue"
@@ -148,7 +171,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       tabindex="0"
       :class="
         cn(
-          'flex gap-3 rounded-lg border border-border bg-muted/15 p-3 text-left transition-colors w-full',
+          'flex gap-3 rounded-lg border border-border bg-muted/15 p-3 text-left transition-colors w-full items-stretch h-full',
+          stretchFill && 'flex-1 min-h-0',
           disabled || loading
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:border-primary/40 hover:bg-muted/25',
@@ -160,7 +184,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       @keydown.space.prevent="openPicker"
     >
       <div
-        class="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40 pointer-events-none"
+        :class="
+          cn(
+            'relative shrink-0 overflow-hidden rounded-md border border-border bg-muted/40 pointer-events-none',
+            PREVIEW_IMAGE_SIZE,
+          )
+        "
       >
         <img
           v-if="thumbFor(modelValue)"
@@ -177,49 +206,49 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <span class="text-[9px]">无预览</span>
         </div>
       </div>
-      <div class="min-w-0 flex-1 space-y-1.5">
-        <div class="pointer-events-none">
-          <p class="text-sm font-semibold leading-snug truncate" :title="selectedTitle">
+      <div
+        :class="
+          cn(
+            'flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border/70 bg-background/60',
+            PREVIEW_INFO_HEIGHT,
+          )
+        "
+      >
+        <div class="shrink-0 border-b border-border/50 px-2 py-1.5 min-h-[2.75rem]">
+          <p class="text-xs font-semibold leading-tight line-clamp-2" :title="selectedTitle">
             {{ selectedTitle }}
           </p>
-          <p class="text-[10px] text-muted-foreground font-mono truncate" :title="modelValue">
+          <p class="text-[10px] text-muted-foreground font-mono truncate mt-0.5" :title="modelValue">
             {{ modelValue }}
           </p>
         </div>
-
-        <div
-          v-if="summaryDisplay"
-          class="rounded-md border border-border/70 bg-background/60 p-2 max-h-32 overflow-auto"
-          @click.stop
-        >
-          <a
-            v-if="summaryDisplay.sourceUrl"
-            :href="summaryDisplay.sourceUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-[11px] text-primary hover:underline block mb-1.5 break-all font-medium"
-            @click.stop
+        <div class="flex-1 min-h-0 overflow-auto p-2">
+          <template v-if="summaryDisplay">
+            <a
+              v-if="summaryDisplay.sourceUrl"
+              :href="summaryDisplay.sourceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-[11px] text-primary hover:underline block mb-1.5 break-all font-medium"
+              @click.stop
+            >
+              {{ summaryDisplay.sourceUrl }}
+            </a>
+            <ModelDescriptionText v-if="summaryDisplay.content" :text="summaryDisplay.content" />
+            <p v-if="summaryDisplay.truncated" class="text-[10px] text-muted-foreground/70 mt-1">
+              （内容已截断）
+            </p>
+          </template>
+          <p
+            v-else-if="summaryLoading"
+            class="text-[10px] text-muted-foreground"
           >
-            {{ summaryDisplay.sourceUrl }}
-          </a>
-          <pre
-            v-if="summaryDisplay.content"
-            class="whitespace-pre-wrap break-words text-[11px] text-muted-foreground leading-relaxed"
-            >{{ summaryDisplay.content }}</pre
-          >
-          <p v-if="summaryDisplay.truncated" class="text-[10px] text-muted-foreground/70 mt-1">
-            （内容已截断）
+            加载说明…
+          </p>
+          <p v-else class="text-[10px] text-muted-foreground">
+            暂无模型说明（可在模型同名文件夹内放置 模型说明.txt）
           </p>
         </div>
-        <p
-          v-else-if="summaryLoading"
-          class="text-[10px] text-muted-foreground pointer-events-none"
-        >
-          加载说明…
-        </p>
-        <p v-else class="text-[10px] text-muted-foreground pointer-events-none">
-          暂无模型说明（可在模型同名文件夹内放置 模型说明.txt）
-        </p>
       </div>
     </div>
 
@@ -236,6 +265,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <Teleport to="body">
       <div
         v-if="open"
+        ref="backdropRef"
         class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55"
         role="dialog"
         aria-modal="true"
@@ -243,6 +273,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         @click.self="closePicker"
       >
         <div
+          ref="panelRef"
           class="flex max-h-[min(88vh,720px)] w-full sm:max-w-3xl flex-col rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
           @click.stop
         >
@@ -283,6 +314,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 v-for="name in filteredOptions"
                 :key="name"
                 type="button"
+                data-picker-card
                 :disabled="disabled"
                 :title="loraCompatHint(name) || modelDisplayTitle(name)"
                 :class="

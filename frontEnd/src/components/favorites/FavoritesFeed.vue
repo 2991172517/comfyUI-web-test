@@ -1,4 +1,6 @@
 <script setup>
+import { nextTick, onMounted, ref, watch } from 'vue'
+import { collapseOut, staggerReveal } from '@/lib/gsap/motion.js'
 import { useFavoritesPageStore } from '@/stores/useFavoritesPageStore.js'
 import Badge from '@/components/ui/Badge.vue'
 import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
@@ -9,12 +11,26 @@ import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
 import { useImageDownload } from '@/composables/useImageDownload.js'
+import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const emit = defineEmits(['preview'])
 
+const gridRef = ref(null)
 const fav = useFavoritesPageStore()
+
+async function revealList() {
+  await nextTick()
+  const items = gridRef.value?.querySelectorAll('[data-stagger-item]')
+  if (!items?.length) return
+  staggerReveal(items, { duration: 0.16, stagger: 0.018 })
+}
+
+onMounted(revealList)
+watch(() => fav.records.length, revealList)
 const app = useAppStore()
 const { saveOne } = useImageDownload()
+const { confirmDelete } = useConfirmDialog()
 
 function formatTime(iso) {
   if (!iso) return '—'
@@ -41,16 +57,25 @@ function saveImage(ev, f) {
 
 async function remove(ev, f) {
   ev.stopPropagation()
-  if (!confirm('取消收藏？（仅删除记录，不删原图）')) return
+  if (
+    !(await confirmDelete({
+      title: '取消收藏',
+      message: '仅删除收藏记录，不删除原图。确定继续？',
+    }))
+  )
+    return
+  const card = ev.currentTarget?.closest?.('[data-stagger-item]')
   try {
     const body = favoriteEntryToTogglePayload(f)
     if (!body?.image?.filename) {
       app.setMessage('无法取消收藏：缺少图片信息', true)
       return
     }
+    if (card) await collapseOut(card)
     await api.toggleFavorite(body)
     fav.removeFromList(f.id)
     app.setMessage('已取消收藏')
+    revealList()
   } catch (e) {
     app.setMessage(e.message, true)
   }
@@ -72,14 +97,16 @@ async function remove(ev, f) {
   </p>
   <div
     v-else
+    ref="gridRef"
     class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
   >
     <article
       v-for="f in fav.records"
       :key="f.id"
+      data-stagger-item
       :class="
         cn(
-          'group cursor-pointer overflow-hidden rounded-xl border-2 bg-card transition-all hover:shadow-md',
+          'group cursor-pointer overflow-visible rounded-xl border-2 bg-card transition-[box-shadow,border-color] duration-200 hover:shadow-md',
           fav.selected?.id === f.id
             ? 'border-amber-500/70 ring-1 ring-amber-500/30'
             : 'border-amber-500/35 hover:border-amber-500/55',
@@ -87,17 +114,16 @@ async function remove(ev, f) {
       "
       @click="select(f)"
     >
-      <div class="relative flex aspect-[4/5] items-center justify-center bg-muted/40 p-1">
-        <img
+      <div class="relative aspect-[4/5] overflow-hidden rounded-t-[10px] bg-muted/40">
+        <ImageMagnifierPreview
           v-if="f.image?.url"
+          fill
           :src="f.image.url"
-          class="max-h-full max-w-full object-contain"
-          loading="lazy"
-          alt=""
+          @click="preview($event, f)"
         />
         <span
           v-else
-          class="flex h-full items-center justify-center px-2 text-center text-xs text-muted-foreground"
+          class="flex h-full w-full items-center justify-center px-2 text-center text-xs text-muted-foreground"
         >
           原图已删除
         </span>

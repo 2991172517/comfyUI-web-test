@@ -9,8 +9,10 @@ import {
   loadCivitaiApiKey,
 } from '@/composables/useCivitaiApiKey.js'
 import { FileDown, FileUp, Loader2 } from 'lucide-vue-next'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const app = useAppStore()
+const { confirm } = useConfirmDialog()
 const emit = defineEmits(['done'])
 
 const exporting = ref(false)
@@ -56,9 +58,13 @@ async function doImportAll() {
     return
   }
   if (
-    !window.confirm(
-      '将按 config/models_manifest.json 批量下载缺失模型；本地已有文件会跳过。体积大、耗时长，是否继续？',
-    )
+    !(await confirm({
+      title: '批量下载模型',
+      message:
+        '将按 config/models_manifest.json 批量下载缺失模型；本地已有文件会跳过。体积大、耗时长，是否继续？',
+      confirmText: '开始下载',
+      variant: 'default',
+    }))
   ) {
     return
   }

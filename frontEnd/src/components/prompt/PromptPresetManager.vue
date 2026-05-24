@@ -23,6 +23,7 @@ import {
   serializePromptConfig,
 } from '@/composables/usePromptConfig.js'
 import { cn } from '@/lib/utils'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 import { isAdmin } from '@/composables/useAuth.js'
 
 defineProps({
@@ -30,6 +31,7 @@ defineProps({
 })
 
 const app = useAppStore()
+const { confirmDelete } = useConfirmDialog()
 const presets = ref([])
 const selectedId = ref('')
 const draft = ref(emptyBatchPromptConfig())
@@ -100,7 +102,7 @@ async function startNew() {
 
 async function removePresetById(p) {
   if (!p?.id) return
-  if (!confirm(`删除预设「${p.name}」？`)) return
+  if (!(await confirmDelete({ message: `删除预设「${p.name}」？` }))) return
   suppressSave.value = true
   markReady(false)
   try {

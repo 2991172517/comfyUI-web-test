@@ -9,14 +9,17 @@ import HistoryImageDetailModal from '@/components/history/HistoryImageDetailModa
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
+import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
 import { buildSingleFavoritePayload } from '@/utils/favoritePayload.js'
 import { ArrowLeft } from 'lucide-vue-next'
 import { isAdmin } from '@/composables/useAuth.js'
 import { useImageDownload } from '@/composables/useImageDownload.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const emit = defineEmits(['back', 'preview', 'deleted'])
 
 const history = useHistoryStore()
+const { confirmDelete } = useConfirmDialog()
 const app = useAppStore()
 const router = useRouter()
 const deleting = ref(false)
@@ -59,7 +62,12 @@ function favPayload() {
 async function removeRecord() {
   const pid = entry.value?.prompt_id
   if (!pid) return
-  if (!confirm('删除该单抽记录？图片文件将一并移除。')) return
+  if (
+    !(await confirmDelete({
+      message: '删除该单抽记录？图片文件将一并移除。',
+    }))
+  )
+    return
   deleting.value = true
   try {
     await history.deleteSingle(pid)
@@ -70,6 +78,11 @@ async function removeRecord() {
   } finally {
     deleting.value = false
   }
+}
+
+function openDetailModal(ev) {
+  if (ev.target.closest('button, textarea, input, a, select, label')) return
+  detailOpen.value = true
 }
 </script>
 
@@ -102,7 +115,6 @@ async function removeRecord() {
           >
             保存
           </Button>
-          <Button variant="outline" size="sm" @click="detailOpen = true">详情</Button>
           <Button size="sm" @click="regenerate">以此生成</Button>
           <Button
             v-if="isAdmin()"
@@ -119,20 +131,27 @@ async function removeRecord() {
       <div class="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_minmax(280px,1.2fr)]">
         <div
           v-if="img?.url"
-          class="relative flex min-h-[240px] items-center justify-center rounded-lg border border-border bg-muted/25 p-3"
+          class="relative flex min-h-[240px] cursor-zoom-in items-center justify-center rounded-lg border border-border bg-muted/25"
+          @click="emit('preview', img.url)"
         >
-          <img
+          <ImageMagnifierPreview
+            fill
             :src="img.url"
-            class="max-h-[min(72vh,900px)] max-w-full cursor-zoom-in object-contain"
-            @click="emit('preview', img.url)"
+            :lens-size="220"
+            :zoom="2.2"
           />
           <FavoriteStar
             v-if="favPayload()"
             :payload="favPayload()"
-            class="absolute right-2 top-2"
+            class="absolute right-2 top-2 z-10"
           />
         </div>
-        <HistoryMetaPanel :meta="entry.meta" :workflow-id="entry.workflow_id" />
+        <div
+          class="cursor-pointer rounded-lg transition-colors hover:bg-accent/30"
+          @click="openDetailModal"
+        >
+          <HistoryMetaPanel :meta="entry.meta" :workflow-id="entry.workflow_id" />
+        </div>
       </div>
     </div>
 

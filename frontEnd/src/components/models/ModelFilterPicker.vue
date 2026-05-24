@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useModalMotion } from '@/composables/useModalMotion.js'
+import { staggerReveal } from '@/lib/gsap/motion.js'
 import { ChevronDown, ImageOff, Search, X } from 'lucide-vue-next'
 import Label from '@/components/ui/Label.vue'
 import Input from '@/components/ui/Input.vue'
@@ -34,6 +36,17 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const meta = computed(() => FOLDER_META[props.folder] || FOLDER_META.loras)
 const open = ref(false)
 const query = ref('')
+const backdropRef = ref(null)
+const panelRef = ref(null)
+
+useModalMotion(open, backdropRef, panelRef)
+
+watch(open, async (v) => {
+  if (!v) return
+  await nextTick()
+  const cards = panelRef.value?.querySelectorAll('[data-picker-card]')
+  if (cards?.length) staggerReveal(cards, { stagger: 0.03 })
+})
 
 const catalogMap = computed(() => {
   const m = new Map()
@@ -166,6 +179,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <Teleport to="body">
       <div
         v-if="open"
+        ref="backdropRef"
         class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55"
         role="dialog"
         aria-modal="true"
@@ -173,6 +187,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         @click.self="closePicker"
       >
         <div
+          ref="panelRef"
           class="flex max-h-[min(88vh,680px)] w-full sm:max-w-3xl flex-col rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
           @click.stop
         >
@@ -203,6 +218,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <button
                 v-if="allowEmpty"
                 type="button"
+                data-picker-card
                 :class="
                   cn(
                     'flex flex-col items-center justify-center rounded-lg border px-2 py-6 text-center transition-colors min-h-[120px]',
@@ -221,6 +237,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 v-for="entry in filteredEntries"
                 :key="entry.value"
                 type="button"
+                data-picker-card
                 :class="
                   cn(
                     'flex flex-col overflow-hidden rounded-lg border text-left transition-colors',

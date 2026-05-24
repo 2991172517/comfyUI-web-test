@@ -77,7 +77,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex w-full min-h-0 flex-col gap-4">
+  <div class="flex w-full min-h-0 flex-col gap-4" data-route-stagger>
     <PageAlert />
 
     <template v-if="!inDetail">

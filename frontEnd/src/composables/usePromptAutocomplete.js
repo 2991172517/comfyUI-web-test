@@ -28,6 +28,7 @@ export function usePromptAutocomplete(textareaRef, options = {}) {
   let debounceTimer = null
   let abortController = null
   let lastRange = { tokenStart: 0, tokenEnd: 0 }
+  let positionRaf = null
   const queryCache = new Map()
 
   function isEnabled() {
@@ -77,6 +78,33 @@ export function usePromptAutocomplete(textareaRef, options = {}) {
     } finally {
       loading.value = false
       abortController = null
+    }
+  }
+
+  function schedulePositionUpdate() {
+    if (!open.value) return
+    if (positionRaf != null) return
+    positionRaf = requestAnimationFrame(() => {
+      positionRaf = null
+      if (open.value) updatePosition()
+    })
+  }
+
+  function attachPositionListeners() {
+    window.addEventListener('scroll', schedulePositionUpdate, true)
+    window.addEventListener('resize', schedulePositionUpdate, { passive: true })
+    const el = textareaRef.value
+    if (el) el.addEventListener('scroll', schedulePositionUpdate, { passive: true })
+  }
+
+  function detachPositionListeners() {
+    window.removeEventListener('scroll', schedulePositionUpdate, true)
+    window.removeEventListener('resize', schedulePositionUpdate)
+    const el = textareaRef.value
+    if (el) el.removeEventListener('scroll', schedulePositionUpdate)
+    if (positionRaf != null) {
+      cancelAnimationFrame(positionRaf)
+      positionRaf = null
     }
   }
 
@@ -189,9 +217,12 @@ export function usePromptAutocomplete(textareaRef, options = {}) {
 
   watch(open, (isOpen) => {
     if (isOpen) {
+      schedulePositionUpdate()
+      attachPositionListeners()
       document.addEventListener('mousedown', onDocumentPointerDown)
       document.addEventListener('touchstart', onDocumentPointerDown, { passive: true })
     } else {
+      detachPositionListeners()
       document.removeEventListener('mousedown', onDocumentPointerDown)
       document.removeEventListener('touchstart', onDocumentPointerDown)
     }
@@ -227,6 +258,7 @@ export function usePromptAutocomplete(textareaRef, options = {}) {
   }
 
   onBeforeUnmount(() => {
+    detachPositionListeners()
     document.removeEventListener('mousedown', onDocumentPointerDown)
     document.removeEventListener('touchstart', onDocumentPointerDown)
     if (debounceTimer) clearTimeout(debounceTimer)

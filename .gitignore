@@ -7,6 +7,22 @@ frontend/dist/
 frontEnd/UI参考/**
 *.local
 
+# ========== 闭源打包产物（PyInstaller / release，体积大，勿提交）==========
+bin/
+release/
+*.zip
+
+# PyInstaller 中间目录与输出（backEnd 内）
+backEnd/build/
+backEnd/dist/
+
+# exe 运行时在项目根生成的可重建数据
+/data/
+
+# 兼容旧规则（其它目录若出现 build/dist 也忽略）
+build/
+dist/
+
 # ========== Python 后端（勿提交虚拟环境与缓存）==========
 **/__pycache__/
 **/*.py[cod]
@@ -19,8 +35,6 @@ frontEnd/UI参考/**
 .ruff_cache/
 *.egg-info/
 .eggs/
-dist/
-build/
 
 # backEnd / backend 目录均适用（项目实际代码在 backEnd）
 backEnd/.venv/
