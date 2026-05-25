@@ -6,7 +6,7 @@ import { useBatchStore } from '@/stores/useBatchStore.js'
 import { useGenerateRunMode } from '@/composables/useGenerateRunMode.js'
 import { useWorkflowRunCategory } from '@/composables/useWorkflowRunCategory.js'
 import { decodeWorkflowSnapshot, loadRestoreSnapshot } from '@/lib/workflowRestore.js'
-import { provideInpaintStore, useInpaintStore } from '@/stores/useInpaintStore.js'
+import { provideInpaintStore } from '@/stores/useInpaintStore.js'
 import { provideUpscaleStore } from '@/stores/useUpscaleStore.js'
 import RunConfigShell from '@/components/run/RunConfigShell.vue'
 import WorkflowRunHeader from '@/components/run/WorkflowRunHeader.vue'
@@ -32,9 +32,8 @@ const router = useRouter()
 const { showBatchResults, showSingleOutput } = useGenerateRunMode()
 const { isInpaint, isUpscale, isGenerateLike, categoryLabel } = useWorkflowRunCategory()
 
-provideInpaintStore()
+const inpaint = provideInpaintStore()
 provideUpscaleStore()
-const inpaint = useInpaintStore()
 
 const healthOk = ref(false)
 

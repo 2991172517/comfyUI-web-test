@@ -217,6 +217,6 @@ export function provideUpscaleStore() {
 
 export function useUpscaleStore() {
   const store = inject(UPSCALE_STORE)
-  if (!store) throw new Error('useUpscaleStore 需在 UpscaleView 内使用')
+  if (!store) throw new Error('useUpscaleStore 需在已调用 provideUpscaleStore 的组件子树内使用')
   return store
 }

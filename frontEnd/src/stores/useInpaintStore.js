@@ -305,7 +305,7 @@ export function provideInpaintStore() {
 export function useInpaintStore() {
   const store = inject(INPAINT_STORE)
   if (!store) {
-    throw new Error('useInpaintStore 需在 InpaintView 内使用')
+    throw new Error('useInpaintStore 需在已调用 provideInpaintStore 的组件子树内使用')
   }
   return store
 }
