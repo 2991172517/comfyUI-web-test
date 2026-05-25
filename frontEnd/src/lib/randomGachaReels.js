@@ -45,6 +45,51 @@ export function collectEnabledRandomGroups(globalConfig, sessionPrompts) {
 }
 
 /**
+ * @param {object | null | undefined} globalConfig
+ * @param {object | null | undefined} sessionPrompts
+ * @param {{ masterEnabled?: boolean }} [opts]
+ */
+export function collectEnabledRandomBundleGroups(
+  globalConfig,
+  sessionPrompts,
+  { masterEnabled = true } = {},
+) {
+  if (!masterEnabled) return []
+  const out = []
+  const seen = new Set()
+
+  const pushGroup = (group) => {
+    if (!group || group.enabled === false) return
+    const id = group.id || group.name
+    if (id && seen.has(id)) return
+    const bundles = (group.bundles || []).filter((b) => String(b.text || '').trim())
+    if (!bundles.length) return
+    if (id) seen.add(id)
+    out.push({ ...group, bundles })
+  }
+
+  const g = globalConfigToPromptLayers(globalConfig)
+  for (const group of g.random_bundle_groups || []) pushGroup(group)
+
+  const s = normalizePromptConfig(sessionPrompts)
+  for (const group of s.random_bundle_groups || []) pushGroup(group)
+
+  return out
+}
+
+export function buildBundleReelCandidates(group) {
+  return (group.bundles || [])
+    .filter((b) => String(b.text || '').trim())
+    .map((b) => {
+      const alias = String(b.alias || '').trim()
+      const preview = String(b.text || '').trim()
+      const short =
+        preview.length > 72 ? `${preview.slice(0, 72)}…` : preview
+      return alias ? `${alias} · ${short}` : short
+    })
+}
+
+/**
  * @param {object} group
  * @returns {string[]}
  */
@@ -77,10 +122,21 @@ export function buildGachaRows(groups, picks) {
   }
 
   const rows = []
+  const bundleById = new Map()
+  for (const g of groups || []) {
+    if (g?.bundles?.length && g?.id) bundleById.set(String(g.id), g)
+  }
+
   for (const pick of picks || []) {
     const gid = pick?.group_id != null ? String(pick.group_id) : ''
-    const group = (gid && byId.get(gid)) || null
-    const name = String(pick?.group_name || group?.name || '随机组').trim() || '随机组'
+    const isBundle = pick?.pick_type === 'bundle_group'
+    const group = isBundle
+      ? bundleById.get(gid) || null
+      : (gid && byId.get(gid)) || null
+    const baseName = String(pick?.group_name || group?.name || '随机组').trim() || '随机组'
+    const name = isBundle
+      ? `${baseName}${pick?.bundle_alias ? ` · ${pick.bundle_alias}` : ''}`
+      : baseName
     const winner =
       String(pick?.text || '').trim() ||
       joinPromptTokens(pick?.tokens || []) ||
@@ -88,13 +144,29 @@ export function buildGachaRows(groups, picks) {
 
     if (!winner) continue
 
-    let candidates = group ? buildReelCandidates(group) : []
-    if (!candidates.length) {
-      candidates = [winner]
+    let candidates = []
+    if (isBundle && group) {
+      candidates = buildBundleReelCandidates(group)
+      const alias = String(pick?.bundle_alias || '').trim()
+      const winnerLabel =
+        alias && winner
+          ? candidates.find((c) => c.startsWith(`${alias} ·`)) || `${alias} · ${winner}`
+          : winner
+      if (!candidates.includes(winnerLabel)) candidates = [...candidates, winnerLabel]
+      rows.push({
+        id: gid || name,
+        name,
+        target: pick?.target || group?.target || 'positive',
+        candidates,
+        winner: winnerLabel,
+        kind: 'bundle',
+      })
+      continue
     }
-    if (!candidates.includes(winner)) {
-      candidates = [...candidates, winner]
-    }
+
+    candidates = group ? buildReelCandidates(group) : []
+    if (!candidates.length) candidates = [winner]
+    if (!candidates.includes(winner)) candidates = [...candidates, winner]
 
     rows.push({
       id: gid || name,
@@ -102,6 +174,7 @@ export function buildGachaRows(groups, picks) {
       target: pick?.target || group?.target || 'positive',
       candidates,
       winner,
+      kind: 'token',
     })
   }
   return rows
@@ -148,12 +221,42 @@ export function simulateGachaRowsForGroups(groups) {
   return buildGachaRows(enabled, picks)
 }
 
+export function simulateGachaRowsForBundleGroups(groups) {
+  const enabled = (groups || []).filter((g) => {
+    if (!g || g.enabled === false) return false
+    return (g.bundles || []).some((b) => String(b.text || '').trim())
+  })
+
+  const picks = enabled.map((group) => {
+    const candidates = buildBundleReelCandidates(group)
+    const bundles = (group.bundles || []).filter((b) => String(b.text || '').trim())
+    const bundle =
+      bundles.length > 0
+        ? bundles[Math.floor(Math.random() * bundles.length)]
+        : null
+    const text = bundle ? String(bundle.text).trim() : ''
+    return {
+      pick_type: 'bundle_group',
+      group_id: group.id,
+      group_name: group.name,
+      target: group.target || 'positive',
+      bundle_alias: bundle?.alias || '',
+      text,
+    }
+  })
+
+  return buildGachaRows(enabled, picks)
+}
+
 /**
  * @param {object} app useAppStore 实例
  * @param {{ globalConfig?: object | null }} [opts]
  * @returns {Promise<ReturnType<typeof buildGachaRows> | null>}
  */
-export async function fetchRandomGachaPlan(app, { globalConfig = null } = {}) {
+export async function fetchRandomGachaPlan(
+  app,
+  { globalConfig = null, bundleMasterEnabled = true } = {},
+) {
   if (!app?.selectedId) return null
 
   const seedNode = app.workflowTargets?.seed_nodes?.[0]
@@ -169,7 +272,12 @@ export async function fetchRandomGachaPlan(app, { globalConfig = null } = {}) {
 
   const session = app.sessionPrompts
   const groups = collectEnabledRandomGroups(globalConfigResolved, session)
-  if (!groups.length) return null
+  const bundleGroups = collectEnabledRandomBundleGroups(
+    globalConfigResolved,
+    session,
+    { masterEnabled: bundleMasterEnabled },
+  )
+  if (!groups.length && !bundleGroups.length) return null
 
   const hasSession = (() => {
     const n = normalizePromptConfig(session)
@@ -193,10 +301,11 @@ export async function fetchRandomGachaPlan(app, { globalConfig = null } = {}) {
     })
     const picks = res?.prompt_picks || []
     if (!picks.length) return null
-    const rows = buildGachaRows(groups, picks)
+    const rows = buildGachaRows([...groups, ...bundleGroups], picks)
     return rows.length ? rows : null
-  } catch {
-    return null
+  } catch (err) {
+    const msg = err?.message || String(err)
+    throw new Error(msg || '提示词合并预览失败')
   }
 }
 

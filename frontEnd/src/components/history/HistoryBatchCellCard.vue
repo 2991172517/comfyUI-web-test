@@ -1,5 +1,12 @@
 <script setup>
+import { computed } from 'vue'
 import { Check } from 'lucide-vue-next'
+import {
+  historyBatchCellImageHeight,
+  historyCardImgClass,
+  historyCardIsNatural,
+  historyCardThumbBoxStyle,
+} from '@/composables/useHistoryCardLayout.js'
 import Button from '@/components/ui/Button.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
 import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
@@ -20,26 +27,35 @@ const emit = defineEmits(['preview', 'detail', 'regenerate', 'save', 'toggle-sel
 function imageUrl(cell) {
   return cell?.images?.[0]?.url
 }
+
+const imageBoxStyle = computed(() => {
+  const h = historyBatchCellImageHeight.value
+  if (h == null) return { minHeight: '6rem' }
+  return { height: `${h}px` }
+})
 </script>
 
 <template>
   <article
     :class="[
-      'flex min-h-0 flex-col overflow-hidden rounded-lg border bg-background transition-colors',
+      'flex min-h-0 w-full max-w-full flex-col overflow-hidden rounded-lg border bg-background transition-colors',
       selected ? 'border-violet-500 ring-2 ring-violet-500/40' : 'border-border',
     ]"
   >
     <template v-if="cell && imageUrl(cell)">
       <button
         type="button"
-        class="relative flex aspect-[3/4] w-full cursor-zoom-in items-center justify-center bg-muted/20 p-0 hover:bg-muted/35"
+        class="relative flex w-full cursor-zoom-in items-center justify-center bg-muted/20 p-0 hover:bg-muted/35 overflow-hidden"
         :class="selectMode ? 'cursor-pointer' : ''"
+        :style="[imageBoxStyle, historyCardIsNatural ? {} : historyCardThumbBoxStyle]"
         @click="selectMode ? emit('toggle-select') : emit('preview')"
       >
         <ImageMagnifierPreview
-          fill
+          :fill="!historyCardIsNatural"
           :src="imageUrl(cell)"
           :alt="cell.label"
+          :img-class="historyCardImgClass"
+          :root-class="historyCardIsNatural ? 'relative w-full' : ''"
           :disabled="selectMode"
         />
         <button
@@ -100,7 +116,8 @@ function imageUrl(cell) {
     </template>
     <div
       v-else
-      class="flex aspect-[3/4] items-center justify-center text-xs text-muted-foreground"
+      class="flex w-full items-center justify-center text-xs text-muted-foreground"
+      :style="imageBoxStyle"
     >
       无图
     </div>

@@ -1,0 +1,63 @@
+# 究极参考流 · 送入采样器的提示词（从 JSON 分栏合并）
+
+> 一采 KSampler Adv #152 与 TTP 二采 KSampler Efficient #281 的 positive 均接 WeiLin 链末端 #382 的 conditioning；
+> negative 均接 #365「负面」模块。
+> FaceDetailer #88 使用同一套 positive/negative（接拼回图后的 conditioning）。
+
+---
+
+## 正向（合并顺序：画质 → 皮肤 → 背景 → 构图 → 人物 → 服装 → 姿势）
+
+/* 画质 */
+best quality, masterpiece, lazypos, very awa,
+
+dynamic tension, playful, highres, flat color, outline,
+
+long toes, slender toes, thin toes, delicate thin feet, gracefully aligned toes,
+
+depth of field,
+
+vibrant colors, delicate, dreamy,,
+
+/* 皮肤 */
+, skindentationill, skindentation, deep skin,,
+
+/* 简洁背景 */
+transparent_background,  (no shadow:1.2), (white_background:1.2), simple background，,
+
+/* 构图 */
+(full_shot), dynamic angle, Flatline, best eyes, (sexy pose:1.1), c7ilf, dynamic shot,,
+
+/* 人物 */
+douki-chan \(douki-chan\), ganbare douki-chan, 1girl, office lady, office lady, brown eyes, brown hair, short hair, sidelocks, short ponytail, blue shirt,,
+
+/* 服装 */
+no shoes, blush, thighhighs, stirrup legwear,,
+
+/* 姿势 */
+looking at viewer, slim_waist, stylish_pose, (feet focus：1.2),
+smile, knees_to_chest, stting, side view,
+toe scrunch, hands on feet,
+
+---
+
+## 负向（节点 365）
+
+lazyneg, low quality, lowres, worstquality, long body, disconnected limbs, extra limb, malformed limbs, missing limb, floating limbs, extra arms, mutated hands, poorly drawn hands, mutated hands and fingers, missing fingers, fused fingers, too many fingers, extra legs, bad feet, lace-trimmed_legwear, fisheye, foreshortening, logo, text, bad proportions, username, signature, watermark, censored, mosaic_censoring, leather, old, elder, WIDE FEET, thick toes, deformed feet, poorly drawn feet,
+
+---
+
+## LoRA 堆（节点 190 WeiLin Lora堆，不在 CLIP 文本里）
+
+见 workflow JSON 中 lora_str；主要：lazypos 0.6, nyalia 0.4, takayanagi 0.3, bikabaka 0.15, Matte_Skin 1.0, Kidmo 0.2, CutePastel 0.2 等。
+
+---
+
+## 一采 / 二采参数
+
+| 阶段 | 节点 | steps | sampler | scheduler | cfg | denoise |
+|------|------|-------|---------|-----------|-----|---------|
+| 一采 | 152 | 30 | euler_ancestral | (Adv 默认) | 5 (浮点节点) | 1.0 |
+| 二采 | 281 | 15 | euler_ancestral | exponential | 6 | 0.35 |
+| 修脸 | 88 FaceDetailer | 30 | euler_ancestral | karras | — | 0.3 |
+

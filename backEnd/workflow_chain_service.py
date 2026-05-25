@@ -22,7 +22,6 @@ from workflow_service import (
     _sort_node_id,
 )
 
-MAX_LORA_SLOTS = 5
 MAX_STYLE_SLOTS = 1
 
 
@@ -42,6 +41,22 @@ def _lora_slots(meta: dict) -> list[dict]:
 
 def _set_lora_slots(meta: dict, slots: list[dict]) -> None:
     meta.setdefault("topology", {})["lora_slots"] = slots
+
+
+def _rewire_lora_chain_order(prompt: dict, meta: dict) -> None:
+    """按 meta.lora_slots 顺序重连整条 LoRA 链的 model/clip。"""
+    ckpt, clip = _checkpoint_and_clip(meta)
+    prev_model: list = [ckpt, 0]
+    prev_clip: list = [clip, 0]
+    for s in _lora_slots(meta):
+        nid = str(s["node_id"])
+        node = prompt.get(nid)
+        if not node or node.get("class_type") not in LORA_CLASS_TYPES:
+            continue
+        node.setdefault("inputs", {})
+        node["inputs"]["model"] = prev_model
+        node["inputs"]["clip"] = prev_clip
+        prev_model, prev_clip = [nid, 0], [nid, 1]
 
 
 def _upstream_for_insert(prompt: dict, meta: dict, after_node_id: str | None) -> tuple[list, list]:
@@ -195,13 +210,13 @@ def get_workflow_essentials(workflow_id: str) -> dict:
             "ckpt_name": ckpt_inputs.get("ckpt_name", ""),
         },
         "lora_chain": chain,
-        "limits": {"max_loras": MAX_LORA_SLOTS, "max_style": MAX_STYLE_SLOTS},
+        "limits": {"max_loras": None, "max_style": MAX_STYLE_SLOTS},
     }
 
 
 def apply_workflow_essentials(workflow_id: str, body: dict) -> dict:
     if is_master_workflow(workflow_id):
-        raise ValueError("母版工作流只读，请另存为子工作流后修改")
+        raise ValueError("内置模板工作流不可修改")
     fmt, prompt = load_workflow_file(workflow_id)
     meta = get_effective_meta(workflow_id)
     overrides: dict[str, dict[str, Any]] = {}
@@ -257,13 +272,11 @@ def add_lora_slot(
     title: str | None = None,
 ) -> dict:
     if is_master_workflow(workflow_id):
-        raise ValueError("母版工作流只读")
+        raise ValueError("内置模板工作流不可修改")
     role = role if role in ("character", "style") else "character"
     fmt, prompt = load_workflow_file(workflow_id)
     meta = get_effective_meta(workflow_id)
     slots = _lora_slots(meta)
-    if len(slots) >= MAX_LORA_SLOTS:
-        raise ValueError(f"LoRA 链最多 {MAX_LORA_SLOTS} 个")
     if role == "style" and sum(1 for s in slots if s.get("role") == "style") >= MAX_STYLE_SLOTS:
         raise ValueError("每条工作流仅允许 1 个 Style LoRA")
 
@@ -325,7 +338,7 @@ def add_lora_slot(
 
 def remove_lora_slot(workflow_id: str, node_id: str) -> dict:
     if is_master_workflow(workflow_id):
-        raise ValueError("母版工作流只读")
+        raise ValueError("内置模板工作流不可修改")
     fmt, prompt = load_workflow_file(workflow_id)
     meta = get_effective_meta(workflow_id)
     slots = _lora_slots(meta)
@@ -354,6 +367,201 @@ def remove_lora_slot(workflow_id: str, node_id: str) -> dict:
     _rebuild_clip_routing(prompt, meta)
     if removed.get("role") == "style":
         meta["style_enabled"] = False
+    save_workflow_file(workflow_id, prompt)
+    save_meta(workflow_id, meta)
+    return get_workflow_essentials(workflow_id)
+
+
+def _remove_lora_from_copy(prompt: dict, meta: dict, node_id: str) -> dict | None:
+    """在内存 prompt/meta 上移除链内 LoRA，不写盘。"""
+    slots = _lora_slots(meta)
+    nid = str(node_id)
+    idx = next((i for i, s in enumerate(slots) if str(s["node_id"]) == nid), -1)
+    if idx < 0:
+        return None
+    removed = slots[idx]
+    prev_id = slots[idx - 1]["node_id"] if idx > 0 else _checkpoint_and_clip(meta)[0]
+    ckpt, clip = _checkpoint_and_clip(meta)
+    if idx == 0:
+        model_src, clip_src = [ckpt, 0], [clip, 0]
+    else:
+        model_src, clip_src = [str(prev_id), 0], [str(prev_id), 1]
+    for s in slots[idx + 1 :]:
+        sid = str(s["node_id"])
+        if sid in prompt:
+            prompt[sid]["inputs"]["model"] = model_src
+            prompt[sid]["inputs"]["clip"] = clip_src
+    if nid in prompt:
+        del prompt[nid]
+    slots.pop(idx)
+    _set_lora_slots(meta, slots)
+    if removed.get("role") == "style":
+        meta["style_enabled"] = False
+    return removed
+
+
+def _add_lora_to_copy(
+    prompt: dict,
+    meta: dict,
+    *,
+    role: str = "character",
+    after_node_id: str | None = None,
+    lora_name: str = "None",
+    title: str | None = None,
+    strength_model: float = 0.65,
+    strength_clip: float = 0.65,
+) -> str:
+    """在内存 prompt/meta 上插入 LoRA，返回新节点 ID。"""
+    role = role if role in ("character", "style") else "character"
+    slots = _lora_slots(meta)
+    if role == "style" and sum(1 for s in slots if s.get("role") == "style") >= MAX_STYLE_SLOTS:
+        raise ValueError("每条工作流仅允许 1 个 Style LoRA")
+    if role == "style":
+        after_node_id = after_node_id or (slots[-1]["node_id"] if slots else _checkpoint_and_clip(meta)[0])
+        insert_idx = len(slots)
+    else:
+        style_idx = next((i for i, s in enumerate(slots) if s.get("role") == "style"), len(slots))
+        if after_node_id:
+            insert_idx = next(
+                (i + 1 for i, s in enumerate(slots) if str(s["node_id"]) == str(after_node_id)),
+                style_idx,
+            )
+        else:
+            insert_idx = style_idx
+        if insert_idx > style_idx:
+            insert_idx = style_idx
+        if not after_node_id and insert_idx > 0:
+            after_node_id = slots[insert_idx - 1]["node_id"]
+        elif not after_node_id:
+            after_node_id = _checkpoint_and_clip(meta)[0]
+    model_in, clip_in = _upstream_for_insert(prompt, meta, after_node_id)
+    new_id = _next_node_id(prompt)
+    prompt[new_id] = {
+        "class_type": "LoraLoader",
+        "inputs": {
+            "lora_name": lora_name,
+            "strength_model": float(strength_model),
+            "strength_clip": float(strength_clip),
+            "model": model_in,
+            "clip": clip_in,
+        },
+        "_meta": {"title": title or ("Style LoRA" if role == "style" else "角色 LoRA")},
+    }
+    for s in slots[insert_idx:]:
+        sid = str(s["node_id"])
+        if sid in prompt and prompt[sid].get("class_type") in LORA_CLASS_TYPES:
+            prompt[sid]["inputs"]["model"] = [new_id, 0]
+            prompt[sid]["inputs"]["clip"] = [new_id, 1]
+    new_slot = {
+        "node_id": new_id,
+        "role": role,
+        "kind": "lora_chain",
+        "optional": role == "style",
+        "sweepable": True,
+        "title": title or ("Style LoRA" if role == "style" else "角色 LoRA"),
+    }
+    slots.insert(insert_idx, new_slot)
+    _set_lora_slots(meta, slots)
+    return new_id
+
+
+SESS_LORA_PREFIX = "sess:"
+
+
+def remap_overrides_for_session(
+    overrides: dict[str, dict[str, Any]],
+    sess_to_real: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    result = copy.deepcopy(overrides or {})
+    for sess_id, real_id in (sess_to_real or {}).items():
+        if sess_id in result:
+            merged = {**(result.get(real_id) or {}), **result[sess_id]}
+            result[real_id] = merged
+            del result[sess_id]
+    for key in list(result):
+        if str(key).startswith(SESS_LORA_PREFIX):
+            del result[key]
+    return result
+
+
+def apply_session_lora_chain(
+    prompt: dict,
+    meta: dict,
+    session: dict | None,
+) -> tuple[dict, dict, dict[str, str]]:
+    """生成页临时 LoRA 链：隐藏 / 新增 / 排序，仅作用于本次 queue 的 prompt 副本。"""
+    if not session:
+        return prompt, meta, {}
+    prompt = copy.deepcopy(prompt)
+    meta = copy.deepcopy(meta)
+    hidden = {str(x) for x in session.get("hidden") or []}
+    added = list(session.get("added") or [])
+    order = [str(x) for x in session.get("order") or []]
+    sess_to_real: dict[str, str] = {}
+
+    for nid in list(hidden):
+        if not str(nid).startswith(SESS_LORA_PREFIX):
+            _remove_lora_from_copy(prompt, meta, nid)
+
+    for item in added:
+        sid = str(item.get("id") or "")
+        if not sid.startswith(SESS_LORA_PREFIX):
+            sid = f"{SESS_LORA_PREFIX}{sid}"
+        new_id = _add_lora_to_copy(
+            prompt,
+            meta,
+            role=item.get("role", "character"),
+            lora_name=item.get("lora_name", "None"),
+            title=item.get("title"),
+            strength_model=float(item.get("strength_model", 0.65)),
+            strength_clip=float(item.get("strength_clip", 0.65)),
+        )
+        sess_to_real[sid] = new_id
+
+    slots = _lora_slots(meta)
+    id_to_slot = {str(s["node_id"]): s for s in slots}
+    if not order:
+        order = [str(s["node_id"]) for s in slots]
+
+    final_ids: list[str] = []
+    seen: set[str] = set()
+    for nid in order:
+        if nid in hidden:
+            continue
+        real = sess_to_real.get(nid) if nid.startswith(SESS_LORA_PREFIX) else nid
+        if not real or real in seen or real not in id_to_slot:
+            continue
+        final_ids.append(real)
+        seen.add(real)
+
+    for s in slots:
+        sid = str(s["node_id"])
+        if sid not in seen and sid not in hidden:
+            final_ids.append(sid)
+            seen.add(sid)
+
+    _set_lora_slots(meta, [id_to_slot[i] for i in final_ids if i in id_to_slot])
+    _rewire_lora_chain_order(prompt, meta)
+    _rebuild_clip_routing(prompt, meta)
+    return prompt, meta, sess_to_real
+
+
+def reorder_lora_slots(workflow_id: str, node_ids: list[str]) -> dict:
+    if is_master_workflow(workflow_id):
+        raise ValueError("内置模板工作流不可修改")
+    fmt, prompt = load_workflow_file(workflow_id)
+    meta = get_effective_meta(workflow_id)
+    slots = _lora_slots(meta)
+    current_ids = [str(s["node_id"]) for s in slots]
+    new_ids = [str(x) for x in node_ids]
+    if len(new_ids) != len(current_ids):
+        raise ValueError("排序列表长度与当前 LoRA 链不一致")
+    if sorted(new_ids) != sorted(current_ids):
+        raise ValueError("排序列表必须包含当前链上全部 LoRA 节点")
+    id_to_slot = {str(s["node_id"]): s for s in slots}
+    _set_lora_slots(meta, [id_to_slot[nid] for nid in new_ids])
+    _rewire_lora_chain_order(prompt, meta)
+    _rebuild_clip_routing(prompt, meta)
     save_workflow_file(workflow_id, prompt)
     save_meta(workflow_id, meta)
     return get_workflow_essentials(workflow_id)

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "variant_id": "局部重绘_inpaint",
+  "display_name": "局部重绘（手动画蒙版）",
+  "style_enabled": false,
+  "style_enabled_default": false,
+  "topology": {
+    "checkpoint_node": "1",
+    "clip_set_last_layer": "2",
+    "lora_slots": [],
+    "positive_encode": {
+      "node_id": "3",
+      "clip_source_node": "2"
+    },
+    "negative_encode": {
+      "node_id": "4",
+      "clip_source_node": "2"
+    },
+    "ksampler_pass1": "30",
+    "save_image": "50",
+    "inpaint": {
+      "source_image_node": "10",
+      "mask_image_node": "11",
+      "conditioning_node": "20",
+      "notes": "需上传原图与蒙版到 ComfyUI input；CustomProject 控制台尚未内置蒙版编辑器"
+    },
+    "future_conditioning_style": {
+      "enabled": false
+    }
+  },
+  "import_source": "handwritten",
+  "import_original_format": "api",
+  "category": "inpaint"
+}

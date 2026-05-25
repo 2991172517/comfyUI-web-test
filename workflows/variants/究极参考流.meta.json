@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "variant_id": "究极参考流",
+  "display_name": "究极参考流",
+  "style_enabled": false,
+  "style_enabled_default": false,
+  "topology": {
+    "checkpoint_node": "1",
+    "clip_set_last_layer": "2",
+    "lora_slots": [
+      {
+        "node_id": "215",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "加载LoRA"
+      }
+    ],
+    "positive_encode": {
+      "node_id": "3",
+      "clip_source_node": "215"
+    },
+    "negative_encode": {
+      "node_id": "4",
+      "clip_source_node": "215"
+    },
+    "ksampler_pass1": "5",
+    "ksampler_pass2": "14",
+    "save_image": "244",
+    "future_conditioning_style": {
+      "enabled": false
+    }
+  },
+  "import_source": "json",
+  "import_original_format": "api",
+  "category": "generate"
+}

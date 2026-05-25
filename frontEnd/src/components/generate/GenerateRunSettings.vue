@@ -46,6 +46,9 @@ const countHint = computed(() => {
           <option value="increment">递增</option>
           <option value="random">随机</option>
         </SelectNative>
+        <p v-if="batch.form.seedMode === 'random'" class="text-[10px] text-muted-foreground leading-snug">
+          每次生成会重新抽取种子并写入所有采样节点（避免 ComfyUI 命中相同输入缓存）。
+        </p>
       </div>
 
       <div v-if="batch.form.seedMode !== 'random'" class="space-y-1.5">

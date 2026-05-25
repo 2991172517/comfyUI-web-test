@@ -70,13 +70,9 @@ watch(
 
         <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <PromptConfigEditor
-            :fixed="app.sessionPrompts.fixed"
             :random-groups="app.sessionPrompts.random_groups"
             :disabled="disabled"
             compact
-            :show-fixed="false"
-            :show-random="true"
-            @update:fixed="app.sessionPrompts.fixed = $event"
             @update:random-groups="app.sessionPrompts.random_groups = $event"
           />
 

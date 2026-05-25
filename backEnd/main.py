@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -14,10 +14,12 @@ from pydantic import BaseModel, Field
 import batch_service
 import batch_store
 import comfy_client
+import comfy_upload_service
 import favorites_service
 import job_service
 import model_preview_service
 import model_folder_service
+import model_paths_service
 import workflow_service
 import ws_tracker
 from config import (
@@ -45,6 +47,7 @@ import prompt_preset_service
 import workflow_chain_service
 import workflow_meta_service
 import workflow_import_service
+import image_restore_service
 from logging_config import setup_logging
 from routers.model_sources import router as model_sources_router
 from routers.model_manifest import router as model_manifest_router
@@ -150,12 +153,16 @@ async def require_auth_middleware(request: Request, call_next):
 class CreateVariantBody(BaseModel):
     variant_id: str | None = None
     display_name: str | None = None
+    category: str | None = None
+    copy_from_workflow_id: str | None = None
 
 
 class WorkflowMetaBody(BaseModel):
     display_name: str | None = None
+    category: str | None = None
     style_enabled: bool | None = None
     style_enabled_default: bool | None = None
+    enabled_preview_node_ids: list[str] | None = None
 
 
 class PromptDefaultsBody(BaseModel):
@@ -184,6 +191,10 @@ class AddLoraSlotBody(BaseModel):
     after_node_id: str | None = None
     lora_name: str = "None"
     title: str | None = None
+
+
+class ReorderLoraSlotsBody(BaseModel):
+    node_ids: list[str] = Field(..., min_length=0)
 
 
 class DeleteOutputsBody(BaseModel):
@@ -235,6 +246,13 @@ class FavoriteBody(BaseModel):
     loras_snapshot: list[dict[str, Any]] | None = None
 
 
+class ImageRestoreBody(BaseModel):
+    filename: str
+    subfolder: str = ""
+    type: str = "output"
+    fallback_snapshot: dict[str, Any] | None = None
+
+
 class PromptSideFixedBody(BaseModel):
     prefix: str = ""
     suffix: str = ""
@@ -254,6 +272,22 @@ class RandomPromptGroupBody(BaseModel):
     weights: list[float] = Field(default_factory=list)
 
 
+class RandomBundleItemBody(BaseModel):
+    id: str = ""
+    alias: str = ""
+    text: str = ""
+
+
+class RandomBundleGroupBody(BaseModel):
+    id: str = ""
+    name: str = ""
+    enabled: bool = True
+    target: str = "positive"
+    pick_mode: str = "random"
+    bundles: list[RandomBundleItemBody] = Field(default_factory=list)
+    weights: list[float] = Field(default_factory=list)
+
+
 class PromptMergeOptionsBody(BaseModel):
     global_before_workflow: bool = False
     random_before_workflow: bool = False
@@ -265,6 +299,7 @@ class BatchPromptsBody(BaseModel):
     negative: str | None = None
     fixed: dict[str, Any] | None = None
     random_groups: list[RandomPromptGroupBody] | None = None
+    random_bundle_groups: list[RandomBundleGroupBody] | None = None
     merge: PromptMergeOptionsBody | None = None
 
 
@@ -272,7 +307,9 @@ class GlobalPromptConfigBody(BaseModel):
     enabled: bool = True
     positive: str = ""
     negative: str = ""
+    gacha_animation_enabled: bool = True
     random_groups: list[RandomPromptGroupBody] | None = None
+    random_bundle_groups: list[RandomBundleGroupBody] | None = None
     merge: PromptMergeOptionsBody | None = None
 
 
@@ -282,6 +319,7 @@ class BatchPromptConfigBody(BaseModel):
     negative: str | None = None
     fixed: dict[str, Any] | None = None
     random_groups: list[RandomPromptGroupBody] | None = None
+    random_bundle_groups: list[RandomBundleGroupBody] | None = None
     merge: PromptMergeOptionsBody | None = None
 
 
@@ -292,6 +330,7 @@ class PromptPresetBody(BaseModel):
     negative: str | None = None
     fixed: dict[str, Any] | None = None
     random_groups: list[RandomPromptGroupBody] | None = None
+    random_bundle_groups: list[RandomBundleGroupBody] | None = None
     merge: PromptMergeOptionsBody | None = None
 
 
@@ -304,11 +343,21 @@ class PromptMergePreviewBody(BaseModel):
     prompt_global_priority: bool | None = None
 
 
+class LoraChainSessionBody(BaseModel):
+    order: list[str] = Field(default_factory=list)
+    hidden: list[str] = Field(default_factory=list)
+    added: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class OverridesBody(BaseModel):
     overrides: dict[str, dict[str, Any]] = {}
     style_enabled: bool | None = None
     batch_prompts: BatchPromptsBody | None = None
     prompt_seed: int | None = None
+    enabled_preview_node_ids: list[str] | None = None
+    lora_chain_session: LoraChainSessionBody | None = None
+    """为 true 时 overrides 内 CLIP 已是最终全文，后端不再做提示词层合并。"""
+    prompts_premerged: bool = False
 
 
 class DeleteBatchItemsBody(BaseModel):
@@ -363,6 +412,8 @@ class BatchGridBody(BaseModel):
     repeat_count: int | None = None
     stop_on_error: bool = True
     prompt_global_priority: bool | None = None
+    enabled_preview_node_ids: list[str] | None = None
+    lora_chain_session: dict[str, Any] | None = None
 
 
 class AuthLoginBody(BaseModel):
@@ -496,11 +547,34 @@ def api_health():
         }
 
 
+@app.post("/api/comfy/upload-image")
+async def api_comfy_upload_image(
+    image: UploadFile = File(...),
+    overwrite: bool = Form(True),
+):
+    """将图片上传到 ComfyUI input，返回 LoadImage 可用的文件名。"""
+    try:
+        raw = await image.read()
+        result = comfy_upload_service.upload_image(
+            raw,
+            image.filename or "upload.png",
+            content_type=image.content_type,
+            overwrite=overwrite,
+        )
+        return {"ok": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
 @app.get("/api/workflows")
 def api_list_workflows():
+    from workflow_categories import categories_payload
+
     return {
         "workflows_dir": str(WORKFLOWS_DIR),
-        "template_id": WORKFLOW_TEMPLATE_ID,
+        "categories": categories_payload(),
         "workflows": workflow_service.list_workflows(),
         "variants": workflow_meta_service.list_variants(),
     }
@@ -526,6 +600,8 @@ def api_create_workflow_variant(body: CreateVariantBody, request: Request):
         entry = workflow_meta_service.create_variant(
             body.variant_id,
             body.display_name,
+            category=body.category,
+            copy_from=body.copy_from_workflow_id,
         )
         return {"ok": True, **entry}
     except ValueError as e:
@@ -554,6 +630,7 @@ async def api_import_workflow(
     file: UploadFile = File(...),
     variant_id: str | None = Form(None),
     display_name: str | None = Form(None),
+    category: str | None = Form(None),
 ):
     _forbid_invite_workflow_config(request)
     raw = await file.read()
@@ -562,6 +639,7 @@ async def api_import_workflow(
             raw,
             variant_id=(variant_id or "").strip() or None,
             display_name=(display_name or "").strip() or None,
+            category=(category or "").strip() or None,
             filename=file.filename or "",
         )
         return {"ok": True, **entry}
@@ -600,9 +678,13 @@ def api_put_global_prompt_config(body: GlobalPromptConfigBody):
         "enabled": body.enabled,
         "positive": body.positive,
         "negative": body.negative,
+        "gacha_animation_enabled": body.gacha_animation_enabled,
         "merge": body.merge.model_dump() if body.merge else {},
         "random_groups": [g.model_dump() for g in body.random_groups]
         if body.random_groups is not None
+        else [],
+        "random_bundle_groups": [g.model_dump() for g in body.random_bundle_groups]
+        if body.random_bundle_groups is not None
         else [],
     }
     saved = global_prompt_config_service.save_global_prompt_config(payload)
@@ -728,6 +810,27 @@ def api_put_prompt_defaults(body: PromptDefaultsBody):
         cfg["merge_mode"] = body.merge_mode
     prompt_defaults_service.save_defaults(cfg)
     return {"ok": True, "defaults": cfg}
+
+
+@app.get("/api/workflows/{workflow_id:path}/preview-nodes")
+def api_get_workflow_preview_nodes(workflow_id: str):
+    """仅返回 PreviewImage 节点列表（供预览 Tab 识别）。"""
+    try:
+        fmt, data = workflow_service.load_workflow_file(workflow_id)
+        if fmt != "api":
+            raise ValueError("仅 API 格式工作流支持预览节点识别")
+        pipeline = workflow_service.discover_pipeline_nodes(data)
+        meta = workflow_meta_service.get_effective_meta(workflow_id)
+        return {
+            "ok": True,
+            "pipeline_nodes": pipeline,
+            "preview_nodes": [n for n in pipeline if n.get("is_preview")],
+            "enabled_preview_node_ids": workflow_meta_service.get_enabled_preview_node_ids(meta),
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/api/workflows/{workflow_id:path}")
@@ -860,7 +963,10 @@ def api_put_workflow_essentials(workflow_id: str, body: EssentialsBody, request:
 
 @app.post("/api/workflows/{workflow_id:path}/lora-slots")
 def api_add_lora_slot(workflow_id: str, body: AddLoraSlotBody, request: Request):
-    _forbid_invite_workflow_config(request)
+    try:
+        auth_service.assert_lora_chain_edit_allowed(_extract_access_token(request))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
     try:
         data = workflow_chain_service.add_lora_slot(
             workflow_id,
@@ -877,9 +983,28 @@ def api_add_lora_slot(workflow_id: str, body: AddLoraSlotBody, request: Request)
 
 
 @app.delete("/api/workflows/{workflow_id:path}/lora-slots/{node_id}")
-def api_remove_lora_slot(workflow_id: str, node_id: str):
+def api_remove_lora_slot(workflow_id: str, node_id: str, request: Request):
+    try:
+        auth_service.assert_lora_chain_edit_allowed(_extract_access_token(request))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
     try:
         data = workflow_chain_service.remove_lora_slot(workflow_id, node_id)
+        return {"ok": True, **data}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.put("/api/workflows/{workflow_id:path}/lora-slots/order")
+def api_reorder_lora_slots(workflow_id: str, body: ReorderLoraSlotsBody, request: Request):
+    try:
+        auth_service.assert_lora_chain_edit_allowed(_extract_access_token(request))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    try:
+        data = workflow_chain_service.reorder_lora_slots(workflow_id, body.node_ids)
         return {"ok": True, **data}
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -896,10 +1021,16 @@ def api_update_workflow_meta(workflow_id: str, body: WorkflowMetaBody, request: 
         )
         if body.display_name is not None:
             meta["display_name"] = body.display_name
+        if body.category is not None:
+            from workflow_categories import normalize_category
+
+            meta["category"] = normalize_category(body.category)
         if body.style_enabled is not None:
             meta["style_enabled"] = body.style_enabled
         if body.style_enabled_default is not None:
             meta["style_enabled_default"] = body.style_enabled_default
+        if body.enabled_preview_node_ids is not None:
+            meta["enabled_preview_node_ids"] = [str(x) for x in body.enabled_preview_node_ids]
         workflow_meta_service.save_meta(workflow_id, meta)
         return {"ok": True, "id": workflow_id, "meta": meta}
     except ValueError as e:
@@ -950,8 +1081,32 @@ def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
         import prompt_defaults_service as pds
         import prompt_queue_log
 
-        should_apply = prompt_build_service.should_apply_prompt_layers(runtime)
-        if should_apply:
+        import workflow_meta_service as wms
+
+        preview_ids = (
+            body.enabled_preview_node_ids
+            if body.enabled_preview_node_ids is not None
+            else wms.get_enabled_preview_node_ids(
+                wms.get_effective_meta(workflow_id, {"style_enabled": body.style_enabled})
+            )
+        )
+        should_apply = (
+            not body.prompts_premerged
+            and prompt_build_service.should_apply_prompt_layers(runtime)
+        )
+        lora_session = (
+            body.lora_chain_session.model_dump() if body.lora_chain_session else None
+        )
+        if body.prompts_premerged:
+            merged = dict(body.overrides)
+            prompt_picks = []
+            prompt_queue_log.append_event(
+                "SINGLE_QUEUE_PREMERGED",
+                workflow_id=workflow_id,
+                source="single_queue",
+                extra={"batch_prompts_sent": bool(runtime)},
+            )
+        elif should_apply:
             merged, prompt_picks = prompt_build_service.build_text_overrides_for_queue(
                 workflow_id,
                 body.overrides,
@@ -961,27 +1116,23 @@ def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
                 index=0,
                 log_source="single_queue",
             )
-            prompt = workflow_service.build_api_prompt(
-                workflow_id,
-                merged,
-                style_enabled=body.style_enabled,
-                apply_defaults=False,
-            )
         else:
             merged = dict(body.overrides)
             prompt_picks = []
-            prompt = workflow_service.build_api_prompt(
-                workflow_id,
-                merged,
-                style_enabled=body.style_enabled,
-                apply_defaults=True,
-            )
             prompt_queue_log.append_event(
                 "SINGLE_QUEUE_SKIP_MERGE",
                 workflow_id=workflow_id,
                 source="single_queue",
                 extra={"should_apply": False, "batch_prompts": bool(runtime)},
             )
+        prompt = workflow_service.build_api_prompt(
+            workflow_id,
+            merged,
+            style_enabled=body.style_enabled,
+            apply_defaults=False,
+            enabled_preview_node_ids=preview_ids,
+            lora_chain_session=lora_session,
+        )
         encode = pds.load_defaults()
         encode_map = {
             "positive": str((encode.get("positive") or {}).get("node_id", "3")),
@@ -1006,7 +1157,13 @@ def api_queue_workflow(workflow_id: str, body: OverridesBody, request: Request):
         result = comfy_client.queue_prompt(prompt, client_id=client_id, prompt_id=prompt_id)
         pid = result.get("prompt_id", prompt_id)
         watch_nodes = _prompt_encode_node_ids(prompt, encode_map)
-        ws_tracker.start_tracking(client_id, pid, prompt_node_ids=watch_nodes)
+        track_nodes = workflow_service.execution_track_node_ids(prompt)
+        ws_tracker.start_tracking(
+            client_id,
+            pid,
+            prompt_node_ids=watch_nodes,
+            execution_node_ids=track_nodes,
+        )
         history_service.persist_single_queued(
             prompt_id=pid,
             workflow_id=workflow_id,
@@ -1038,6 +1195,8 @@ def _preset_payload_from_body(body: PromptPresetBody, *, for_update: bool = Fals
         "description": body.description,
         "fixed": body.fixed,
     }
+    if for_update and body.name is not None:
+        payload["name"] = body.name.strip()
     if body.positive is not None:
         payload["positive"] = body.positive
     if body.negative is not None:
@@ -1096,6 +1255,7 @@ def _batch_payload(body: BatchGridBody) -> dict:
         "repeat_count": body.repeat_count,
         "stop_on_error": body.stop_on_error,
         "prompt_global_priority": body.prompt_global_priority,
+        "enabled_preview_node_ids": body.enabled_preview_node_ids,
     }
     if body.lora_axes:
         payload["lora_axes"] = [a.model_dump() for a in body.lora_axes]
@@ -1109,18 +1269,6 @@ def _batch_payload(body: BatchGridBody) -> dict:
         if body.count_b is not None:
             payload["lora_b"]["count"] = body.count_b
     return payload
-
-
-@app.post("/api/workflows/{workflow_id:path}/batch/preview")
-def api_batch_preview(workflow_id: str, body: BatchGridBody, request: Request):
-    _forbid_invite_batch(request)
-    try:
-        plan = batch_service.build_grid_plan(workflow_id, _batch_payload(body))
-        return {"ok": True, "plan": plan}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/api/workflows/{workflow_id:path}/batch")
@@ -1324,6 +1472,25 @@ def api_get_job(prompt_id: str):
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+@app.websocket("/ws/generate-events")
+async def ws_generate_events(websocket: WebSocket):
+    """推送单张/批量 ComfyUI 执行进度，供前端替代轮询。"""
+    import job_events_hub
+
+    await websocket.accept()
+    job_events_hub.register(websocket)
+    try:
+        await job_events_hub.send_snapshot(websocket)
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        log.exception("generate-events websocket closed")
+    finally:
+        job_events_hub.unregister(websocket)
+
+
 @app.delete("/api/jobs/{prompt_id}/outputs")
 def api_delete_job_outputs(prompt_id: str, body: DeleteOutputsBody | None = None):
     try:
@@ -1333,6 +1500,22 @@ def api_delete_job_outputs(prompt_id: str, body: DeleteOutputsBody | None = None
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@app.post("/api/images/restore-snapshot")
+def api_image_restore_snapshot(body: ImageRestoreBody):
+    """从 PNG 内嵌 ComfyUI 元数据构建「以此生成」快照；无元数据时回退 fallback_snapshot。"""
+    try:
+        return image_restore_service.build_restore_snapshot_from_image(
+            filename=body.filename,
+            subfolder=body.subfolder or "",
+            folder_type=body.type or "output",
+            fallback_snapshot=body.fallback_snapshot,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/api/view")
@@ -1406,6 +1589,27 @@ def api_remove_favorite(favorite_id: str):
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+class ModelPathSettingsBody(BaseModel):
+    checkpoints: str = ""
+    loras: str = ""
+
+
+@app.get("/api/models/path-settings")
+def api_get_model_path_settings():
+    return {"ok": True, **model_paths_service.get_settings_response()}
+
+
+@app.put("/api/models/path-settings")
+def api_save_model_path_settings(body: ModelPathSettingsBody):
+    try:
+        data = model_paths_service.save_settings(
+            {"checkpoints": body.checkpoints, "loras": body.loras}
+        )
+        return {"ok": True, **data}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 @app.get("/api/models/folder-paths")
 def api_model_folder_paths():
     paths = model_folder_service.list_folder_paths()
@@ -1427,7 +1631,9 @@ def api_open_model_folder(body: OpenModelFolderBody):
 @app.get("/api/models/{folder}")
 def api_models(folder: str, with_previews: bool = Query(False)):
     try:
-        files = comfy_client.list_models(folder)
+        files = model_paths_service.list_model_filenames(folder)
+        if not files:
+            files = comfy_client.list_models(folder)
         if with_previews:
             enriched = model_preview_service.enrich_model_files(folder, files)
             return {"folder": folder, "files": files, "models": enriched}

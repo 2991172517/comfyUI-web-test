@@ -1,0 +1,39 @@
+{
+  "10": {
+    "inputs": {
+      "image": "upscale_source.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "原图（上传）"
+    }
+  },
+  "20": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 1.5,
+      "quality": "ULTRA",
+      "images": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX 高清放大"
+    }
+  },
+  "50": {
+    "inputs": {
+      "filename_prefix": "upscale",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存结果"
+    }
+  }
+}

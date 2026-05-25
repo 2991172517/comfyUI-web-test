@@ -12,6 +12,9 @@ import { getConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const BATCH_STORE = Symbol('batchStore')
 
+/** 供 store 方法 / 异步回调使用（inject 仅能在组件 setup 中调用） */
+let batchStoreSingleton = null
+
 const DEFAULT_FILENAME_TEMPLATE =
   '{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}'
 
@@ -29,6 +32,8 @@ export function createBatchStore(app) {
     items: [],
     grid: null,
     currentLabel: '',
+    currentPromptId: '',
+    cellProgress: null,
   })
 
   const form = reactive({
@@ -45,7 +50,6 @@ export function createBatchStore(app) {
   /** @type {Record<string, object>} 每个 LoRA 节点：固定权重或扫参 */
   const loraAxisState = reactive({})
 
-  const preview = ref(null)
   const historyRecords = ref([])
   const historyLoading = ref(false)
   const selectedHistoryId = ref('')
@@ -59,15 +63,27 @@ export function createBatchStore(app) {
 
   function batchProgressPercent() {
     if (!batch.total) return 0
-    return Math.round((batch.completed / batch.total) * 100)
+    const cellFrac =
+      typeof batch.cellProgress === 'number' ? batch.cellProgress / 100 : 0
+    const frac = batch.completed + (isBatchRunningNow() ? cellFrac : 0)
+    return Math.min(100, Math.round((frac / batch.total) * 100))
+  }
+
+  function batchProgressFractionLabel() {
+    if (!batch.total) return '0/0'
+    const current = isBatchRunningNow()
+      ? Math.min(batch.completed + 1, batch.total)
+      : Math.min(batch.completed, batch.total)
+    return `${current}/${batch.total}`
   }
 
   function syncLoraAxisState() {
-    const ids = new Set(app.workflowLoras.map((l) => l.node_id))
+    const loras = app.lorasForRun
+    const ids = new Set(loras.map((l) => l.node_id))
     for (const id of Object.keys(loraAxisState)) {
       if (!ids.has(id)) delete loraAxisState[id]
     }
-    for (const l of app.workflowLoras) {
+    for (const l of loras) {
       if (!loraAxisState[l.node_id]) {
         loraAxisState[l.node_id] = {
           enabled: false,
@@ -91,7 +107,7 @@ export function createBatchStore(app) {
   }
 
   function reassignSweepRoles() {
-    const pool = app.workflowLoras.filter((l) => {
+    const pool = app.lorasForRun.filter((l) => {
       if (l.role === 'style' && !app.styleEnabled) return false
       return true
     })
@@ -111,7 +127,7 @@ export function createBatchStore(app) {
 
   function toggleLoraSweep(nodeId, enabled) {
     if (!loraAxisState[nodeId]) return
-    const enabledList = app.workflowLoras.filter((l) => loraAxisState[l.node_id]?.enabled)
+    const enabledList = app.lorasForRun.filter((l) => loraAxisState[l.node_id]?.enabled)
     if (enabled && enabledList.length >= 2 && !loraAxisState[nodeId].enabled) {
       app.setMessage('最多 2 个 LoRA 参与扫参', true)
       return
@@ -121,7 +137,7 @@ export function createBatchStore(app) {
   }
 
   function enabledSweepLoras() {
-    return app.workflowLoras.filter((l) => loraAxisState[l.node_id]?.enabled)
+    return app.lorasForRun.filter((l) => loraAxisState[l.node_id]?.enabled)
   }
 
   function sweepAxesEnabled() {
@@ -155,7 +171,7 @@ export function createBatchStore(app) {
 
   function applyDefaultStrategy() {
     syncLoraAxisState()
-    for (const l of app.workflowLoras) {
+    for (const l of app.lorasForRun) {
       const st = loraAxisState[l.node_id]
       if (!st) continue
       st.enabled = false
@@ -167,7 +183,7 @@ export function createBatchStore(app) {
   }
 
   function buildLoraAxesPayload() {
-    return app.workflowLoras.map((l) => {
+    return app.lorasForRun.map((l) => {
       const st = loraAxisState[l.node_id] || {}
       return {
         node_id: l.node_id,
@@ -187,7 +203,7 @@ export function createBatchStore(app) {
 
   function buildBatchBody() {
     const base = { ...app.overrides }
-    for (const l of app.workflowLoras) {
+    for (const l of app.lorasForRun) {
       const st = loraAxisState[l.node_id]
       if (!st || st.enabled) continue
       if (!base[l.node_id]) base[l.node_id] = {}
@@ -209,6 +225,10 @@ export function createBatchStore(app) {
       seed_node_id: app.workflowTargets?.seed_node_id,
       filename_template: form.filenameTemplate,
       lora_axes: buildLoraAxesPayload(),
+      enabled_preview_node_ids: [...(app.enabledPreviewNodeIds || [])],
+      ...(app.sessionLoraPayloadForQueue()
+        ? { lora_chain_session: app.sessionLoraPayloadForQueue() }
+        : {}),
     }
   }
 
@@ -229,6 +249,48 @@ export function createBatchStore(app) {
     batch.items = entry.items || []
     batch.grid = entry.plan?.grid || batch.grid
     batch.currentLabel = entry.current_label || ''
+    batch.currentPromptId = entry.current_prompt_id || ''
+  }
+
+  async function refreshBatchItems() {
+    if (!batch.batchId) return
+    try {
+      const entry = await api.getBatch(batch.batchId)
+      batch.items = entry.items || []
+      if (entry.run_config) runConfig.value = entry.run_config
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function applyWsBatchEvent(ev) {
+    if (!batch.batchId || ev.batch_id !== batch.batchId) return
+    const prevCompleted = batch.completed
+    batch.status = ev.status || batch.status
+    batch.statusText = statusLabel(batch.status)
+    batch.completed = ev.completed ?? batch.completed
+    batch.total = ev.total ?? batch.total
+    batch.currentLabel = ev.current_label || batch.currentLabel
+    if (ev.current_prompt_id !== batch.currentPromptId) {
+      batch.cellProgress = null
+    }
+    batch.currentPromptId = ev.current_prompt_id || ''
+    batch.message = ev.message || batch.message
+    if (
+      isBatchRunningNow() &&
+      (ev.completed !== prevCompleted || ev.current_prompt_id)
+    ) {
+      void refreshBatchItems()
+    }
+    if (['completed', 'failed', 'cancelled', 'deleted'].includes(batch.status)) {
+      stopBatchPoll()
+      void refreshBatchItems().then(() => refreshHistory())
+    }
+  }
+
+  function applyWsCellJobEvent(ev) {
+    if (!batch.currentPromptId || ev.prompt_id !== batch.currentPromptId) return
+    batch.cellProgress = ev.progress ?? null
   }
 
   async function loadBatchPromptConfig() {
@@ -275,7 +337,6 @@ export function createBatchStore(app) {
       const entry = await api.getBatch(rec.batch_id)
       applyBatchEntry(entry)
       runConfig.value = entry.run_config || null
-      preview.value = null
       if (['running', 'cancelling'].includes(entry.status)) {
         batchPollTimer = setInterval(pollBatch, 1200)
       }
@@ -295,6 +356,10 @@ export function createBatchStore(app) {
 
   async function pollBatch() {
     if (!batch.batchId) return
+    if (typeof window !== 'undefined') {
+      const { isGenerateWsConnected } = await import('@/lib/generateQueueWs.js')
+      if (isGenerateWsConnected()) return
+    }
     try {
       const entry = await api.getBatch(batch.batchId)
       applyBatchEntry(entry)
@@ -309,34 +374,46 @@ export function createBatchStore(app) {
     }
   }
 
-  async function previewPlan() {
-    if (!app.selectedId) return
-    try {
-      const res = await api.batchPreview(app.selectedId, buildBatchBody())
-      preview.value = res.plan
-      app.setMessage(`预览：共 ${res.plan.grid.total} 张（${res.plan.grid.a_count}×${res.plan.grid.b_count}）`)
-    } catch (e) {
-      app.setMessage(e.message, true)
+  async function startBatchCore() {
+    const res = await api.startBatch(app.selectedId, buildBatchBody())
+    batch.batchId = res.batch_id
+    batch.total = res.total
+    batch.grid = res.grid
+    batch.status = 'running'
+    batch.statusText = statusLabel('running')
+    batch.completed = 0
+    batch.cellProgress = null
+    batch.items = []
+    batch.message = `批量已开始，共 ${res.total} 张`
+    app.setMessage(batch.message)
+    stopBatchPoll()
+    const { isGenerateWsConnected } = await import('@/lib/generateQueueWs.js')
+    if (isGenerateWsConnected()) {
+      batchPollTimer = setInterval(refreshBatchItems, 2500)
+    } else {
+      pollBatch()
+      batchPollTimer = setInterval(pollBatch, 1200)
     }
+    refreshHistory()
+    return { batchId: res.batch_id, total: res.total }
   }
 
   async function startBatch() {
-    if (!app.selectedId || isBatchRunningNow()) return
+    if (!app.selectedId) return
+    const total = plannedBatchTotal()
+    const label = `批量生成 · ${total} 张`
     try {
-      const res = await api.startBatch(app.selectedId, buildBatchBody())
-      batch.batchId = res.batch_id
-      batch.total = res.total
-      batch.grid = res.grid
-      batch.status = 'running'
-      batch.statusText = statusLabel('running')
-      batch.completed = 0
-      batch.items = []
-      batch.message = `批量已开始，共 ${res.total} 张`
-      app.setMessage(batch.message)
-      stopBatchPoll()
-      pollBatch()
-      batchPollTimer = setInterval(pollBatch, 1200)
-      refreshHistory()
+      const { getGenerateQueueStore } = await import('@/stores/useGenerateQueueStore.js')
+      const queue = getGenerateQueueStore()
+      if (queue) {
+        return queue.submit({
+          type: 'batch',
+          label,
+          batchTotal: total,
+          run: startBatchCore,
+        })
+      }
+      await startBatchCore()
     } catch (e) {
       app.setMessage(e.message, true)
     }
@@ -440,7 +517,6 @@ export function createBatchStore(app) {
   const store = reactive({
     batch,
     form,
-    preview,
     historyRecords,
     historyLoading,
     selectedHistoryId,
@@ -453,11 +529,16 @@ export function createBatchStore(app) {
     get batchProgress() {
       return batchProgressPercent()
     },
+    get batchProgressFraction() {
+      return batchProgressFractionLabel()
+    },
+    applyWsBatchEvent,
+    applyWsCellJobEvent,
     get gridCells() {
       return gridCellsMatrix()
     },
     get loras() {
-      return app.workflowLoras
+      return app.lorasForRun
     },
     loraAxisState,
     batchPromptSaving,
@@ -480,7 +561,6 @@ export function createBatchStore(app) {
     refreshHistory,
     openHistoryRecord,
     formatRecordTime,
-    previewPlan,
     startBatch,
     cancelBatch,
     deleteBatch,
@@ -493,12 +573,22 @@ export function createBatchStore(app) {
     statusBadgeVariant,
   })
 
+  batchStoreSingleton = store
   provide(BATCH_STORE, store)
   return store
 }
 
+/** 非组件上下文（如 queueWorkflow）取批量 store；勿在组件内用 inject 调用 */
+export function getBatchStore() {
+  if (!batchStoreSingleton) {
+    throw new Error('Batch store 未初始化，请确认 AppLayout 已挂载')
+  }
+  return batchStoreSingleton
+}
+
 export function useBatchStore() {
-  const store = inject(BATCH_STORE)
+  const injected = inject(BATCH_STORE, null)
+  const store = injected ?? batchStoreSingleton
   if (!store) throw new Error('useBatchStore must be used within AppLayout')
   return store
 }

@@ -7,13 +7,11 @@ import struct
 import zlib
 from typing import Any
 
-from config import WORKFLOW_TEMPLATE_ID
+from workflow_categories import normalize_category
 from workflow_meta_service import (
     VARIANT_PREFIX,
-    _infer_meta_from_template,
     _variant_json_path,
     allocate_variant_id,
-    load_meta,
     sanitize_variant_id,
     save_meta,
 )
@@ -282,6 +280,7 @@ def import_as_variant(
     *,
     variant_id: str | None = None,
     display_name: str | None = None,
+    category: str | None = None,
     filename: str = "",
 ) -> dict[str, Any]:
     source, data, fmt = _parse_workflow_payload(raw, filename=filename)
@@ -304,15 +303,14 @@ def import_as_variant(
     workflow_id = f"{VARIANT_PREFIX}{safe}"
     save_workflow_file(workflow_id, prompt)
 
-    template_meta = load_meta(WORKFLOW_TEMPLATE_ID) or _infer_meta_from_template(WORKFLOW_TEMPLATE_ID)
+    cat = normalize_category(category)
     meta = {
         "schema_version": 1,
-        "template_id": WORKFLOW_TEMPLATE_ID,
-        "is_master": False,
         "variant_id": safe,
+        "category": cat,
         "display_name": display_name or safe,
-        "style_enabled": template_meta.get("style_enabled_default", False),
-        "style_enabled_default": template_meta.get("style_enabled_default", False),
+        "style_enabled": False,
+        "style_enabled_default": False,
         "topology": infer_topology_from_prompt(prompt),
         "import_source": source,
         "import_original_format": fmt,
@@ -323,6 +321,7 @@ def import_as_variant(
         "id": workflow_id,
         "variant_id": safe,
         "display_name": meta["display_name"],
+        "category": cat,
         "analysis": analysis,
     }
 
@@ -332,7 +331,7 @@ def delete_variant(workflow_id: str) -> dict[str, str]:
 
     workflow_id = normalize_variant_workflow_id(workflow_id)
     if not workflow_id.startswith(VARIANT_PREFIX):
-        raise ValueError("只能删除子工作流")
+        raise ValueError("只能删除 variants/ 下的工作流")
     vid = workflow_id.split("/", 1)[1]
     json_path = _variant_json_path(vid)
     meta_path = WORKFLOW_VARIANTS_DIR / f"{vid}{META_SUFFIX}"

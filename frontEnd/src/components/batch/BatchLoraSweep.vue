@@ -9,7 +9,7 @@ import CardDescription from '@/components/ui/CardDescription.vue'
 import CardContent from '@/components/ui/CardContent.vue'
 import Label from '@/components/ui/Label.vue'
 import Input from '@/components/ui/Input.vue'
-import SelectNative from '@/components/ui/SelectNative.vue'
+import DirectionToggle from '@/components/ui/DirectionToggle.vue'
 import Badge from '@/components/ui/Badge.vue'
 import ModelSelectField from '@/components/models/ModelSelectField.vue'
 import { cn } from '@/lib/utils'
@@ -102,10 +102,10 @@ watch(
             </div>
             <div class="space-y-1.5">
               <Label>方向</Label>
-              <SelectNative v-model="batch.loraAxisState[l.node_id].direction" :disabled="disabled">
-                <option value="up">累加 ↑</option>
-                <option value="down">累减 ↓</option>
-              </SelectNative>
+              <DirectionToggle
+                v-model="batch.loraAxisState[l.node_id].direction"
+                :disabled="disabled"
+              />
             </div>
             <div class="space-y-1.5">
               <Label>档位数</Label>

@@ -2,857 +2,77 @@
   "schema_version": 1,
   "tasks": [
     {
-      "task_id": "4bf3dcfee9",
-      "name": "配对 #0001 · eroticnansensusanima_pre × lazypos",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors"
-          },
-          "16": {
-            "lora_name": "lazypos.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "eroticnansensusanima_pre",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "lazypos",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "lazypos.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:22.961172+00:00",
-      "updated_at": "2026-05-20T17:39:46.569173+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_172128_d39e9a"
-        ],
-        "last_batch_id": "20260520_172128_d39e9a",
-        "executed_at": "2026-05-20T17:39:46.567670+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "1369c20e43",
-      "name": "配对 #0002 · bikabaka × nyalia_NoobXL",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "bikabaka.safetensors"
-          },
-          "16": {
-            "lora_name": "nyalia_NoobXL.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "bikabaka",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "bikabaka.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "nyalia_NoobXL",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "nyalia_NoobXL.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:22.981260+00:00",
-      "updated_at": "2026-05-20T17:57:25.864699+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_173946_520f02"
-        ],
-        "last_batch_id": "20260520_173946_520f02",
-        "executed_at": "2026-05-20T17:57:25.864699+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "ac166b92cf",
-      "name": "配对 #0003 · NJ_Vector_Style × Nyalia_-_Style",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "NJ_Vector_Style.safetensors"
-          },
-          "16": {
-            "lora_name": "Nyalia_-_Style.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "NJ_Vector_Style",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "NJ_Vector_Style.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "Nyalia_-_Style",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "Nyalia_-_Style.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:22.989766+00:00",
-      "updated_at": "2026-05-20T18:15:04.017303+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_175725_74d2c4"
-        ],
-        "last_batch_id": "20260520_175725_74d2c4",
-        "executed_at": "2026-05-20T18:15:04.017303+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "d075000f52",
-      "name": "配对 #0004 · deadpurityv2anima_v1_1-s × merrytailanima_preview3_",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          "16": {
-            "lora_name": "merrytailanima_preview3_1.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "deadpurityv2anima_v1_1-s",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "merrytailanima_preview3_",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "merrytailanima_preview3_1.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.011797+00:00",
-      "updated_at": "2026-05-20T18:33:08.129676+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_181504_c8903d"
-        ],
-        "last_batch_id": "20260520_181504_c8903d",
-        "executed_at": "2026-05-20T18:33:08.129171+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "567f78aeaa",
-      "name": "配对 #0005 · Lovely labrynth of the s × takayanagi_katsuya",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "Lovely labrynth of the silver castle illuXL v2.safetensors"
-          },
-          "16": {
-            "lora_name": "takayanagi_katsuya.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "Lovely labrynth of the s",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "Lovely labrynth of the silver castle illuXL v2.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "takayanagi_katsuya",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "takayanagi_katsuya.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.019303+00:00",
-      "updated_at": "2026-05-20T18:50:47.370233+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_183308_5d09fc"
-        ],
-        "last_batch_id": "20260520_183308_5d09fc",
-        "executed_at": "2026-05-20T18:50:47.370233+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "70ef9a079c",
-      "name": "配对 #0006 · deadpurityv2anima_v1_1-s × lazypos",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          "16": {
-            "lora_name": "lazypos.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "deadpurityv2anima_v1_1-s",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "lazypos",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "lazypos.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.027312+00:00",
-      "updated_at": "2026-05-20T19:08:50.066012+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_185047_661d30"
-        ],
-        "last_batch_id": "20260520_185047_661d30",
-        "executed_at": "2026-05-20T19:08:50.066012+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "1e38267275",
-      "name": "配对 #0007 · NJ_Vector_Style × takayanagi_katsuya",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "NJ_Vector_Style.safetensors"
-          },
-          "16": {
-            "lora_name": "takayanagi_katsuya.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "NJ_Vector_Style",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "NJ_Vector_Style.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "takayanagi_katsuya",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "takayanagi_katsuya.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.035830+00:00",
-      "updated_at": "2026-05-20T19:26:27.261907+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_190850_3c7f6a"
-        ],
-        "last_batch_id": "20260520_190850_3c7f6a",
-        "executed_at": "2026-05-20T19:26:27.261907+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "448b63f6a2",
-      "name": "配对 #0008 · deadpurityv2anima_v1_1-s × eroticnansensusanima_pre",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          "16": {
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "deadpurityv2anima_v1_1-s",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "deadpurityv2anima_v1_1-step00004000.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "eroticnansensusanima_pre",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.057980+00:00",
-      "updated_at": "2026-05-20T19:44:30.674996+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_192627_d56990"
-        ],
-        "last_batch_id": "20260520_192627_d56990",
-        "executed_at": "2026-05-20T19:44:30.674996+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "68efe1e3ef",
-      "name": "配对 #0009 · Nyalia_-_Style × bikabaka",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "Nyalia_-_Style.safetensors"
-          },
-          "16": {
-            "lora_name": "bikabaka.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "Nyalia_-_Style",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "Nyalia_-_Style.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "bikabaka",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "bikabaka.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.066494+00:00",
-      "updated_at": "2026-05-20T20:02:08.177276+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_194430_2cb99c"
-        ],
-        "last_batch_id": "20260520_194430_2cb99c",
-        "executed_at": "2026-05-20T20:02:08.177276+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "119b9777f0",
-      "name": "配对 #0010 · Lovely labrynth of the s × lazypos",
-      "description": "LoRA 配对 · 工作流 First_api · 5×5 扫参 · 提示词=全局默认底稿+全局随机组（已清空母版 CLIP 长文案）",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "15": {
-            "lora_name": "Lovely labrynth of the silver castle illuXL v2.safetensors"
-          },
-          "16": {
-            "lora_name": "lazypos.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": ""
-          }
-        },
-        "prompt_global_priority": true,
-        "style_enabled": true,
-        "seed_mode": "random",
-        "sync_clip": true,
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "Lovely labrynth of the s",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "lora_name": "Lovely labrynth of the silver castle illuXL v2.safetensors"
-          },
-          {
-            "node_id": "16",
-            "enabled": true,
-            "alias": "lazypos",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "lora_name": "lazypos.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-20T17:21:23.074137+00:00",
-      "updated_at": "2026-05-20T20:19:42.695221+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260520_200208_a6e751"
-        ],
-        "last_batch_id": "20260520_200208_a6e751",
-        "executed_at": "2026-05-20T20:19:42.694220+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "22180527db",
-      "name": "链测试 · 25张",
+      "task_id": "a590ce3556",
+      "name": "test_chain_rtx_ttp · 4张",
       "description": "",
-      "workflow_id": "variants/test_chain_edit",
-      "workflow_display_name": "链测试",
+      "workflow_id": "variants/test_chain_rtx_ttp_2",
+      "workflow_display_name": "test_chain_rtx_ttp",
       "batch_payload": {
         "base_overrides": {
           "1": {
-            "ckpt_name": "rinFeatherfall_v40.safetensors"
+            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
           },
           "3": {
-            "text": "masterpiece, best quality, amazing quality, absurdres, highres, \n1girl, solo, (mature big sister:1.3), (gentle onee-san:1.25), elegant mature woman, kind caring older sister, soft timid personality, soft mature beauty, \n\ngolden blonde hair, long golden blonde hair, side-swept hair covering one eye, hair over one eye, soft strands, green eyes, droopy eyes, big sister droopy eyes, gentle sleepy eyes, soft shy smile, light blush, embarrassed shy expression, warm gentle expression, \n\nvoluptuous mature figure, large breasts, soft plump breasts tightly wrapped by clothes, breast strain, clothes tightly squeezing large breasts, prominent rounded breast shape, natural slight cleavage with crucifix nestled inside, slim narrow waist, gently wide hips, (long legs:1.25), (very long legs:1.2), long slender legs, elongated legs, long lower body, tall body proportion, slim thighs, shapely calves, beautiful leg curves, graceful hip lines, perfect full body proportions, ideal leg length, \n\noff-shoulder nun outfit, black off-shoulder nun dress, exposed shoulders, tight upper body nun robes, long black nun skirt with side slit below hips, \n\nwhite lace garter belt and sheer white lace stockings with garter straps visible through skirt slit, translucent white thighhighs, silky sheer white stockings, detailed stocking texture, subtle skin visible through stockings, \n\ngolden crucifix necklace, crucifix pendant nestled in cleavage, \n\nfull body view, full body shot, entire body visible, three-quarter view, 正侧视角, standing gracefully, slight contrapposto, legs slightly apart, hands gently clasped in front of waist, looking at viewer shyly, \n\nplain background, simple solid background, \n\nclean thick lineart, sharp outlines, subtle soft edge glow, slight outline effect, soft smooth skin texture, delicate skin details, matte skin, soft fabric texture, detailed lace stockings texture, soft cel-shading with minimal highlights"
+            "text": "best quality, masterpiece, lazypos, very awa, dynamic tension, playful, highres, flat color, outline, long toes, slender toes, thin toes, delicate thin feet, gracefully aligned toes, depth of field, vibrant colors, delicate, dreamy, skindentationill, skindentation, deep skin, transparent_background, (no shadow:1.2), (white_background:1.2), simple background, (full_shot), dynamic angle, Flatline, best eyes, (sexy pose:1.1), c7ilf, dynamic shot, douki-chan (douki-chan), ganbare douki-chan, 1girl, office lady, brown eyes, brown hair, short hair, sidelocks, short ponytail, blue shirt, no shoes, blush, thighhighs, stirrup legwear, looking at viewer, slim_waist, stylish_pose, (feet focus:1.2), smile, knees_to_chest, stting, side view, toe scrunch, hands on feet"
           },
           "4": {
-            "text": "lowres, bad quality, worst quality, blurry, deformed, bad anatomy, extra limbs, bad hands, cropped, half body, upper body, close-up, prayer hands, hands together in front of chest, black stockings, glossy skin, shiny skin, massive breasts, huge breasts, deep cleavage, high slit, exposed hips, complex background, short legs, stubby legs, short lower body, squat legs, thick short legs, chibi proportions, child proportions, bandy legs, disproportionately short legs"
+            "text": "lazyneg, low quality, lowres, worstquality, long body, disconnected limbs, extra limb, malformed limbs, missing limb, floating limbs, extra arms, mutated hands, poorly drawn hands, mutated hands and fingers, missing fingers, fused fingers, too many fingers, extra legs, bad feet, lace-trimmed_legwear, fisheye, foreshortening, logo, text, bad proportions, username, signature, watermark, censored, mosaic_censoring, leather, old, elder, WIDE FEET, thick toes, deformed feet, poorly drawn feet"
           },
           "5": {
-            "seed": 292010586090985,
+            "noise_seed": 292010586090985,
             "steps": 30,
-            "cfg": 6.5,
-            "sampler_name": "dpmpp_2m_sde",
-            "scheduler": "normal"
+            "cfg": 5,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "normal",
+            "add_noise": "enable"
           },
           "6": {
             "width": 832,
             "height": 1216,
             "batch_size": 1
           },
-          "14": {
-            "seed": 44949633277485,
-            "steps": 30,
-            "cfg": 6.5,
-            "sampler_name": "dpmpp_2m_sde",
-            "scheduler": "normal"
-          },
-          "15": {
-            "lora_name": "ratatatat74-000005.safetensors",
-            "strength_model": 0.65,
-            "strength_clip": 0.65
-          },
-          "17": {
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors",
-            "strength_model": 0.65,
-            "strength_clip": 0.65
-          }
-        },
-        "style_enabled": false,
-        "batch_prompts": {
-          "enabled": true,
-          "positive": "",
-          "negative": "",
-          "fixed": {
-            "positive": {
-              "prefix": "",
-              "suffix": ""
-            },
-            "negative": {
-              "prefix": "",
-              "suffix": ""
-            }
-          },
-          "merge": {
-            "global_before_workflow": false,
-            "random_before_workflow": false
-          },
-          "random_groups": []
-        },
-        "prompt_global_priority": false,
-        "seed_mode": "fixed",
-        "seed": 0,
-        "sync_clip": true,
-        "save_node_id": "8",
-        "seed_node_id": "5",
-        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
-        "lora_axes": [
-          {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "ratatatat74-000005",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.1,
-            "direction": "up",
-            "count": 5,
-            "fixed_strength_model": 0.65,
-            "fixed_strength_clip": 0.65,
-            "lora_name": "ratatatat74-000005.safetensors"
-          },
-          {
-            "node_id": "17",
-            "enabled": true,
-            "alias": "eroticnansensusanima_preview3_1-step00004000",
-            "sweep_role": "B",
-            "start": 0.8,
-            "step": 0.1,
-            "direction": "down",
-            "count": 5,
-            "fixed_strength_model": 0.65,
-            "fixed_strength_clip": 0.65,
-            "lora_name": "eroticnansensusanima_preview3_1-step00004000.safetensors"
-          }
-        ]
-      },
-      "planned_total": 25,
-      "created_at": "2026-05-21T10:49:25.712756+00:00",
-      "updated_at": "2026-05-21T11:08:34.736175+00:00",
-      "execution": {
-        "status": "completed",
-        "batch_ids": [
-          "20260521_105016_51748b"
-        ],
-        "last_batch_id": "20260521_105016_51748b",
-        "executed_at": "2026-05-21T11:08:34.734671+00:00",
-        "last_error": null
-      }
-    },
-    {
-      "task_id": "bbd6cf07c6",
-      "name": "母版（LoRA 链 + 放大） · 9张",
-      "description": "",
-      "workflow_id": "First_api",
-      "workflow_display_name": "母版（LoRA 链 + 放大）",
-      "batch_payload": {
-        "base_overrides": {
-          "1": {
-            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
-          },
-          "3": {
-            "text": ""
-          },
-          "4": {
-            "text": "lowres, bad quality, worst quality, blurry, deformed, bad anatomy, extra limbs, bad hands, cropped, half body, upper body, close-up, prayer hands, hands together in front of chest, black stockings, glossy skin, shiny skin, massive breasts, huge breasts, deep cleavage, high slit, exposed hips, complex background, short legs, stubby legs, short lower body, squat legs, thick short legs, chibi proportions, child proportions, bandy legs, disproportionately short legs"
-          },
-          "5": {
-            "seed": 292010586090985,
-            "steps": 30,
-            "cfg": 6.5,
-            "sampler_name": "dpmpp_2m_sde",
-            "scheduler": "normal"
-          },
-          "6": {
-            "width": 832,
-            "height": 1216,
-            "batch_size": 1
+          "12": {
+            "lora_name": "lazypos.safetensors",
+            "strength_model": 0.6,
+            "strength_clip": 0.6
           },
           "14": {
             "seed": 44949633277485,
-            "steps": 30,
-            "cfg": 6.5,
-            "sampler_name": "dpmpp_2m_sde",
-            "scheduler": "normal"
+            "steps": 15,
+            "cfg": 6,
+            "denoise": 0.35,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "exponential"
           },
-          "15": {
+          "16": {
+            "lora_name": "nyalia_NoobXL.safetensors",
+            "strength_model": 0.4,
+            "strength_clip": 0.4
+          },
+          "18": {
+            "lora_name": "takayanagi_katsuya.safetensors",
+            "strength_model": 0.3,
+            "strength_clip": 0.3
+          },
+          "19": {
             "lora_name": "bikabaka.safetensors",
-            "strength_model": 0.65,
-            "strength_clip": 0.65
+            "strength_model": 0.15,
+            "strength_clip": 0.15
           },
-          "16": {
-            "lora_name": "blobcg_v1.safetensors",
-            "strength_model": 0.5,
-            "strength_clip": 0.5
+          "23": {
+            "lora_name": "Matte_Skin_Illustrious_v4.safetensors",
+            "strength_model": 1,
+            "strength_clip": 1
+          },
+          "24": {
+            "lora_name": "Kidmo_Artstyle__Illustrious.safetensors",
+            "strength_model": 0.2,
+            "strength_clip": 0.2
+          },
+          "25": {
+            "lora_name": "CutePastelILf.safetensors",
+            "strength_model": 0.2,
+            "strength_clip": 0.2
           }
         },
         "style_enabled": false,
@@ -862,22 +82,22 @@
           "negative": "",
           "fixed": {
             "positive": {
-              "prefix": "masterpiece, best quality, amazing quality, absurdres,\n\n1girl, solo,\n(mature big sister:1.25), (gentle onee-san:1.2),\nelegant mature woman, soft mature beauty,\n\ngolden blonde hair, long golden blonde hair,\nside-swept hair covering one eye,\ngreen eyes, droopy eyes,\n\nvoluptuous mature figure,\nlarge breasts,\nbreast strain,\nclothes tightly squeezing large breasts,\nslim narrow waist,\ngently wide hips,\n(long legs:1.2),\nlong slender legs,\nelongated legs,\ntall body proportion,\nbeautiful leg curves,\n\noff-shoulder nun outfit,\nblack off-shoulder nun dress,\nexposed shoulders,\ntight upper body nun robes,\nlong black nun skirt with side slit,\n\ngolden crucifix necklace,\ncrucifix pendant,\n\nstanding gracefully,\nslight contrapposto,\n\nplain background,\nsimple background",
+              "prefix": "",
               "suffix": ""
             },
             "negative": {
-              "prefix": "lowres, worst quality, bad quality, blurry,\n\ndeformed, bad anatomy, extra limbs, extra fingers, bad hands,\n\ncropped, close-up, upper body, half body,\nmultiple views, split screen,\n\nchild proportions, chibi proportions,\nshort legs, short lower body, stubby legs,\nthick short legs, bandy legs,\ndisproportionate body, oversized head,\n\nmassive breasts, huge breasts, exaggerated breasts,\ndeep cleavage,\n\nhigh slit, exposed hips,\n\ncomplex background, cluttered background,\n\nblack stockings,\nglossy skin, oily skin,\n\nprayer hands,\nhands together in front of chest",
+              "prefix": "",
               "suffix": ""
             }
           },
           "merge": {
             "global_before_workflow": false,
-            "random_before_workflow": false
+            "random_before_workflow": true
           },
           "random_groups": []
         },
-        "prompt_global_priority": false,
-        "seed_mode": "fixed",
+        "prompt_global_priority": true,
+        "seed_mode": "increment",
         "seed": 0,
         "sync_clip": true,
         "save_node_id": "8",
@@ -885,41 +105,320 @@
         "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
         "lora_axes": [
           {
-            "node_id": "15",
-            "enabled": true,
-            "alias": "bikabaka",
-            "sweep_role": "A",
-            "start": 0.3,
-            "step": 0.2,
+            "node_id": "12",
+            "enabled": false,
+            "alias": "lazypos",
+            "sweep_role": null,
+            "start": 0.6,
+            "step": 0.1,
             "direction": "up",
-            "count": 3,
-            "fixed_strength_model": 0.65,
-            "fixed_strength_clip": 0.65,
-            "lora_name": "bikabaka.safetensors"
+            "count": 4,
+            "fixed_strength_model": 0.6,
+            "fixed_strength_clip": 0.6,
+            "lora_name": "lazypos.safetensors"
           },
           {
             "node_id": "16",
-            "enabled": true,
-            "alias": "blobcg_v1",
+            "enabled": false,
+            "alias": "nyalia_NoobXL",
             "sweep_role": null,
-            "start": 0.9,
+            "start": 0.4,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.4,
+            "fixed_strength_clip": 0.4,
+            "lora_name": "nyalia_NoobXL.safetensors"
+          },
+          {
+            "node_id": "18",
+            "enabled": false,
+            "alias": "takayanagi_katsuya",
+            "sweep_role": null,
+            "start": 0.3,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.3,
+            "fixed_strength_clip": 0.3,
+            "lora_name": "takayanagi_katsuya.safetensors"
+          },
+          {
+            "node_id": "19",
+            "enabled": true,
+            "alias": "bikabaka",
+            "sweep_role": "A",
+            "start": 0.15,
+            "step": 0.1,
+            "direction": "up",
+            "count": 2,
+            "fixed_strength_model": 0.15,
+            "fixed_strength_clip": 0.15,
+            "lora_name": "bikabaka.safetensors"
+          },
+          {
+            "node_id": "23",
+            "enabled": false,
+            "alias": "Matte_Skin_Illustrious_v4",
+            "sweep_role": null,
+            "start": 1,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 1,
+            "fixed_strength_clip": 1,
+            "lora_name": "Matte_Skin_Illustrious_v4.safetensors"
+          },
+          {
+            "node_id": "24",
+            "enabled": true,
+            "alias": "Kidmo_Artstyle__Illustrious",
+            "sweep_role": "B",
+            "start": 0.2,
+            "step": 0.1,
+            "direction": "up",
+            "count": 2,
+            "fixed_strength_model": 0.2,
+            "fixed_strength_clip": 0.2,
+            "lora_name": "Kidmo_Artstyle__Illustrious.safetensors"
+          },
+          {
+            "node_id": "25",
+            "enabled": false,
+            "alias": "CutePastelILf",
+            "sweep_role": null,
+            "start": 0.2,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.2,
+            "fixed_strength_clip": 0.2,
+            "lora_name": "CutePastelILf.safetensors"
+          }
+        ],
+        "enabled_preview_node_ids": []
+      },
+      "planned_total": 4,
+      "created_at": "2026-05-25T14:45:17.019982+00:00",
+      "updated_at": "2026-05-25T14:51:36.639535+00:00",
+      "execution": {
+        "status": "completed",
+        "batch_ids": [
+          "20260525_144850_1d6f91"
+        ],
+        "last_batch_id": "20260525_144850_1d6f91",
+        "executed_at": "2026-05-25T14:51:36.632536+00:00",
+        "last_error": null
+      }
+    },
+    {
+      "task_id": "7572af1a0d",
+      "name": "test_chain_rtx_ttp · 4张",
+      "description": "",
+      "workflow_id": "variants/test_chain_rtx_ttp_2",
+      "workflow_display_name": "test_chain_rtx_ttp",
+      "batch_payload": {
+        "base_overrides": {
+          "1": {
+            "ckpt_name": "waiIllustriousSDXL_v170.safetensors"
+          },
+          "3": {
+            "text": "best quality, masterpiece, lazypos, very awa, dynamic tension, playful, highres, flat color, outline, long toes, slender toes, thin toes, delicate thin feet, gracefully aligned toes, depth of field, vibrant colors, delicate, dreamy, skindentationill, skindentation, deep skin, transparent_background, (no shadow:1.2), (white_background:1.2), simple background, (full_shot), dynamic angle, Flatline, best eyes, (sexy pose:1.1), c7ilf, dynamic shot, douki-chan (douki-chan), ganbare douki-chan, 1girl, office lady, brown eyes, brown hair, short hair, sidelocks, short ponytail, blue shirt, no shoes, blush, thighhighs, stirrup legwear, looking at viewer, slim_waist, stylish_pose, (feet focus:1.2), smile, knees_to_chest, stting, side view, toe scrunch, hands on feet"
+          },
+          "4": {
+            "text": "lazyneg, low quality, lowres, worstquality, long body, disconnected limbs, extra limb, malformed limbs, missing limb, floating limbs, extra arms, mutated hands, poorly drawn hands, mutated hands and fingers, missing fingers, fused fingers, too many fingers, extra legs, bad feet, lace-trimmed_legwear, fisheye, foreshortening, logo, text, bad proportions, username, signature, watermark, censored, mosaic_censoring, leather, old, elder, WIDE FEET, thick toes, deformed feet, poorly drawn feet"
+          },
+          "5": {
+            "noise_seed": 292010586090985,
+            "steps": 30,
+            "cfg": 5,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "normal",
+            "add_noise": "enable"
+          },
+          "6": {
+            "width": 832,
+            "height": 1216,
+            "batch_size": 1
+          },
+          "12": {
+            "lora_name": "lazypos.safetensors",
+            "strength_model": 0.6,
+            "strength_clip": 0.6
+          },
+          "14": {
+            "seed": 44949633277485,
+            "steps": 15,
+            "cfg": 6,
+            "denoise": 0.35,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "exponential"
+          },
+          "16": {
+            "lora_name": "nyalia_NoobXL.safetensors",
+            "strength_model": 0.4,
+            "strength_clip": 0.4
+          },
+          "18": {
+            "lora_name": "takayanagi_katsuya.safetensors",
+            "strength_model": 0.3,
+            "strength_clip": 0.3
+          },
+          "19": {
+            "lora_name": "bikabaka.safetensors",
+            "strength_model": 0.15,
+            "strength_clip": 0.15
+          },
+          "23": {
+            "lora_name": "Matte_Skin_Illustrious_v4.safetensors",
+            "strength_model": 1,
+            "strength_clip": 1
+          },
+          "24": {
+            "lora_name": "Kidmo_Artstyle__Illustrious.safetensors",
+            "strength_model": 0.2,
+            "strength_clip": 0.2
+          },
+          "25": {
+            "lora_name": "CutePastelILf.safetensors",
+            "strength_model": 0.2,
+            "strength_clip": 0.2
+          }
+        },
+        "style_enabled": false,
+        "batch_prompts": {
+          "enabled": true,
+          "positive": "",
+          "negative": "",
+          "fixed": {
+            "positive": {
+              "prefix": "",
+              "suffix": ""
+            },
+            "negative": {
+              "prefix": "",
+              "suffix": ""
+            }
+          },
+          "merge": {
+            "global_before_workflow": false,
+            "random_before_workflow": true
+          },
+          "random_groups": []
+        },
+        "prompt_global_priority": true,
+        "seed_mode": "increment",
+        "seed": 0,
+        "sync_clip": true,
+        "save_node_id": "8",
+        "seed_node_id": "5",
+        "filename_template": "{batch_id}/g{index:02d}_{a_name}_w{a_w}_{a_dir}_x_{b_name}_w{b_w}_{b_dir}_seed{seed}",
+        "lora_axes": [
+          {
+            "node_id": "12",
+            "enabled": false,
+            "alias": "lazypos",
+            "sweep_role": null,
+            "start": 0.6,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.6,
+            "fixed_strength_clip": 0.6,
+            "lora_name": "lazypos.safetensors"
+          },
+          {
+            "node_id": "16",
+            "enabled": false,
+            "alias": "nyalia_NoobXL",
+            "sweep_role": null,
+            "start": 0.4,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.4,
+            "fixed_strength_clip": 0.4,
+            "lora_name": "nyalia_NoobXL.safetensors"
+          },
+          {
+            "node_id": "18",
+            "enabled": false,
+            "alias": "takayanagi_katsuya",
+            "sweep_role": null,
+            "start": 0.3,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.3,
+            "fixed_strength_clip": 0.3,
+            "lora_name": "takayanagi_katsuya.safetensors"
+          },
+          {
+            "node_id": "19",
+            "enabled": true,
+            "alias": "bikabaka",
+            "sweep_role": "A",
+            "start": 0.15,
+            "step": 0.1,
+            "direction": "up",
+            "count": 2,
+            "fixed_strength_model": 0.15,
+            "fixed_strength_clip": 0.15,
+            "lora_name": "bikabaka.safetensors"
+          },
+          {
+            "node_id": "23",
+            "enabled": true,
+            "alias": "Matte_Skin_Illustrious_v4",
+            "sweep_role": "B",
+            "start": 1,
             "step": 0.2,
             "direction": "down",
-            "count": 3,
-            "fixed_strength_model": 0.5,
-            "fixed_strength_clip": 0.5,
-            "lora_name": "blobcg_v1.safetensors"
+            "count": 2,
+            "fixed_strength_model": 1,
+            "fixed_strength_clip": 1,
+            "lora_name": "Matte_Skin_Illustrious_v4.safetensors"
+          },
+          {
+            "node_id": "24",
+            "enabled": false,
+            "alias": "Kidmo_Artstyle__Illustrious",
+            "sweep_role": "B",
+            "start": 0.2,
+            "step": 0.1,
+            "direction": "up",
+            "count": 2,
+            "fixed_strength_model": 0.2,
+            "fixed_strength_clip": 0.2,
+            "lora_name": "Kidmo_Artstyle__Illustrious.safetensors"
+          },
+          {
+            "node_id": "25",
+            "enabled": false,
+            "alias": "CutePastelILf",
+            "sweep_role": null,
+            "start": 0.2,
+            "step": 0.1,
+            "direction": "up",
+            "count": 4,
+            "fixed_strength_model": 0.2,
+            "fixed_strength_clip": 0.2,
+            "lora_name": "CutePastelILf.safetensors"
           }
-        ]
+        ],
+        "enabled_preview_node_ids": []
       },
-      "planned_total": 9,
-      "created_at": "2026-05-21T11:56:32.203809+00:00",
-      "updated_at": "2026-05-21T11:56:32.203809+00:00",
+      "planned_total": 4,
+      "created_at": "2026-05-25T14:45:38.838812+00:00",
+      "updated_at": "2026-05-25T14:48:50.326425+00:00",
       "execution": {
-        "status": "pending",
-        "batch_ids": [],
-        "last_batch_id": null,
-        "executed_at": null
+        "status": "completed",
+        "batch_ids": [
+          "20260525_144604_f15fdd"
+        ],
+        "last_batch_id": "20260525_144604_f15fdd",
+        "executed_at": "2026-05-25T14:48:50.325425+00:00",
+        "last_error": null
       }
     }
   ]

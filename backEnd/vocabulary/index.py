@@ -464,6 +464,46 @@ def get_category_tree(db_path: Path) -> dict:
         conn.close()
 
 
+def collect_descendant_category_ids(conn: sqlite3.Connection, category_id: str) -> list[str]:
+    """分类及其全部子孙分类的内部分 id（含自身）。"""
+    root = resolve_internal_category_id(conn, category_id)
+    if not root:
+        return []
+    out: list[str] = []
+    stack = [int(root)]
+    seen: set[str] = set()
+    while stack:
+        cur = stack.pop()
+        sid = str(cur)
+        if sid in seen:
+            continue
+        seen.add(sid)
+        out.append(sid)
+        rows = conn.execute(
+            "SELECT id FROM categories WHERE parent_id = ?",
+            (cur,),
+        ).fetchall()
+        for r in rows:
+            stack.append(int(r["id"]))
+    return out
+
+
+def count_prompts_in_category_subtree(db_path: Path, category_id: str) -> int:
+    conn = _connect(db_path)
+    try:
+        cids = collect_descendant_category_ids(conn, category_id)
+        if not cids:
+            return 0
+        placeholders = ",".join("?" * len(cids))
+        row = conn.execute(
+            f"SELECT COUNT(*) AS c FROM vocab WHERE category_id IN ({placeholders})",
+            cids,
+        ).fetchone()
+        return int(row["c"]) if row else 0
+    finally:
+        conn.close()
+
+
 def list_prompts_in_category(
     db_path: Path,
     category_id: str,
@@ -482,8 +522,13 @@ def list_prompts_in_category(
         if not cid:
             return {"items": [], "total": 0, "offset": offset, "limit": limit}
 
-        where = "category_id = ?"
-        params: list = [cid]
+        cids = collect_descendant_category_ids(conn, cid)
+        if not cids:
+            return {"items": [], "total": 0, "offset": offset, "limit": limit}
+
+        placeholders = ",".join("?" * len(cids))
+        where = f"category_id IN ({placeholders})"
+        params: list = list(cids)
         if q:
             where += " AND (insert_lower LIKE ? OR label LIKE ?)"
             like = f"%{q}%"

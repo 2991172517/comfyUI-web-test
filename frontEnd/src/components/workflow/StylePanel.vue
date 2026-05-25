@@ -17,7 +17,7 @@ const styleSlot = computed(() =>
 const topologyNote = computed(() => {
   const kind = styleSlot.value?.kind || 'lora_chain'
   if (kind === 'lora_chain') {
-    return '当前母版：Style 为链末 LoRA(#16)，关闭时 model/负向 CLIP 改接角色 LoRA(#15)。理想拓扑为 正向 CLIP → Style 节点 → KSampler①（预留 conditioning）。'
+    return 'Style 为链末 LoRA 时，关闭后 model/负向 CLIP 改接角色 LoRA。理想拓扑为 正向 CLIP → Style 节点 → KSampler①（预留 conditioning）。'
   }
   return 'Conditioning Style 节点（IPAdapter 等）将在后续模板中启用。'
 })
@@ -43,7 +43,6 @@ const topologyNote = computed(() => {
       <Badge :variant="store.styleEnabled ? 'default' : 'secondary'">
         {{ store.styleEnabled ? '链上生效' : '已绕过 #16' }}
       </Badge>
-      <Badge v-if="store.isMasterWorkflow" variant="outline">母版 · 参数另存子工作流</Badge>
     </CardContent>
   </Card>
 </template>

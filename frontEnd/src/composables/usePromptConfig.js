@@ -23,6 +23,7 @@ export function emptyBatchPromptConfig() {
     negative: '',
     fixed: emptyFixedSides(),
     random_groups: [],
+    random_bundle_groups: [],
     merge: emptyMergeOptions(),
   }
 }
@@ -35,6 +36,26 @@ export function newRandomGroup(name = '') {
     target: 'positive',
     pick_mode: 'random',
     prompts: [''],
+    weights: [1],
+  }
+}
+
+export function newRandomBundle(alias = '') {
+  return {
+    id: `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    alias: alias || '新词条',
+    text: '',
+  }
+}
+
+export function newRandomBundleGroup(name = '') {
+  return {
+    id: `bg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    name: name || '新随机词串组',
+    enabled: true,
+    target: 'positive',
+    pick_mode: 'random',
+    bundles: [newRandomBundle()],
     weights: [1],
   }
 }
@@ -94,6 +115,28 @@ export function normalizePromptConfig(raw) {
       weights: normalizeGroupWeights(prompts, g.weights),
     }
   })
+  base.random_bundle_groups = (raw.random_bundle_groups || []).map((g) => {
+    let bundles = (g.bundles || []).map((b) => ({
+      id: b.id || newRandomBundle().id,
+      alias: String(b.alias || '').trim() || '未命名',
+      text: String(b.text ?? ''),
+    }))
+    if (!bundles.length) bundles = [newRandomBundle()]
+    const pickMode = g.pick_mode === 'sequential' ? 'sequential' : 'random'
+    const texts = bundles.map((b) => b.text)
+    return {
+      id: g.id || newRandomBundleGroup().id,
+      name: g.name || '未命名词串组',
+      enabled: g.enabled !== false,
+      target: g.target === 'negative' ? 'negative' : 'positive',
+      pick_mode: pickMode,
+      bundles,
+      weights: normalizeGroupWeights(
+        bundles.map((b) => b.text || ' '),
+        g.weights,
+      ),
+    }
+  })
   return base
 }
 
@@ -106,6 +149,7 @@ export function serializePromptConfig(cfg) {
     fixed: cfg.fixed,
     merge: { ...(cfg.merge || emptyMergeOptions()) },
     random_groups: [],
+    random_bundle_groups: [],
   }
   for (const g of cfg.random_groups || []) {
     const prompts = (g.prompts || []).map((p) => String(p).trim()).filter(Boolean)
@@ -120,18 +164,45 @@ export function serializePromptConfig(cfg) {
       weights: normalizeGroupWeights(prompts, g.weights),
     })
   }
+  for (const g of cfg.random_bundle_groups || []) {
+    const bundles = (g.bundles || [])
+      .map((b) => ({
+        id: b.id,
+        alias: String(b.alias || '').trim() || '未命名',
+        text: String(b.text || '').trim(),
+      }))
+      .filter((b) => b.text)
+    if (!bundles.length) continue
+    out.random_bundle_groups.push({
+      id: g.id,
+      name: g.name,
+      enabled: !!g.enabled,
+      target: g.target,
+      pick_mode: g.pick_mode === 'sequential' ? 'sequential' : 'random',
+      bundles,
+      weights: normalizeGroupWeights(
+        bundles.map((b) => b.text),
+        g.weights,
+      ),
+    })
+  }
   return out
 }
 
 export function promptConfigHasContent(cfg) {
   const n = normalizePromptConfig(cfg)
   if (String(n.positive).trim() || String(n.negative).trim()) return true
-  for (const side of ['positive', 'negative']) {
-    const f = n.fixed[side]
-    if (f.prefix?.trim() || f.suffix?.trim()) return true
+  if (
+    (n.random_groups || []).some(
+      (g) => g.enabled !== false && (g.prompts || []).some((p) => String(p).trim()),
+    )
+  ) {
+    return true
   }
-  return (n.random_groups || []).some(
-    (g) => g.enabled !== false && (g.prompts || []).some((p) => String(p).trim()),
+  return (n.random_bundle_groups || []).some(
+    (g) =>
+      g.enabled !== false &&
+      (g.bundles || []).some((b) => String(b.text || '').trim()),
   )
 }
 
@@ -143,12 +214,12 @@ export function promptConfigSummary(cfg) {
     (g) => g.enabled !== false && (g.prompts || []).some((p) => String(p).trim()),
   )
   if (groups.length) parts.push(`${groups.length} 个随机组`)
-  const hasFixed =
-    n.fixed.positive?.prefix?.trim() ||
-    n.fixed.positive?.suffix?.trim() ||
-    n.fixed.negative?.prefix?.trim() ||
-    n.fixed.negative?.suffix?.trim()
-  if (hasFixed) parts.push('固定前后缀')
+  const bundleGroups = (n.random_bundle_groups || []).filter(
+    (g) =>
+      g.enabled !== false &&
+      (g.bundles || []).some((b) => String(b.text || '').trim()),
+  )
+  if (bundleGroups.length) parts.push(`${bundleGroups.length} 个词串组`)
   if (String(n.positive).trim() || String(n.negative).trim()) parts.push('正/负全文')
   return parts.join(' · ') || ''
 }
@@ -168,6 +239,11 @@ export function clonePromptConfig(cfg) {
       prompts: [...g.prompts],
       weights: [...(g.weights || [])],
     })),
+    random_bundle_groups: (n.random_bundle_groups || []).map((g) => ({
+      ...g,
+      bundles: (g.bundles || []).map((b) => ({ ...b })),
+      weights: [...(g.weights || [])],
+    })),
     merge: { ...n.merge },
   }
 }
@@ -184,6 +260,15 @@ export function applyPromptConfigTo(target, cfg) {
     target.random_groups.splice(0, target.random_groups.length, ...cloned.random_groups)
   } else {
     target.random_groups = cloned.random_groups
+  }
+  if (Array.isArray(target.random_bundle_groups)) {
+    target.random_bundle_groups.splice(
+      0,
+      target.random_bundle_groups.length,
+      ...cloned.random_bundle_groups,
+    )
+  } else {
+    target.random_bundle_groups = cloned.random_bundle_groups
   }
   return cloned
 }
@@ -208,12 +293,16 @@ export function globalConfigToPromptLayers(config) {
 }
 
 /** 全局配置 PUT /api/global-prompt-config */
-export function serializeGlobalPromptConfig(cfg) {
+export function serializeGlobalPromptConfig(cfg, extras = {}) {
   const n = normalizePromptConfig(cfg)
   return {
     enabled: n.enabled,
     positive: n.positive,
     negative: n.negative,
+    gacha_animation_enabled:
+      extras.gacha_animation_enabled !== undefined
+        ? !!extras.gacha_animation_enabled
+        : true,
     merge: { ...n.merge },
     random_groups: (n.random_groups || [])
       .map((g) => {
@@ -227,6 +316,30 @@ export function serializeGlobalPromptConfig(cfg) {
           pick_mode: g.pick_mode === 'sequential' ? 'sequential' : 'random',
           prompts,
           weights: normalizeGroupWeights(prompts, g.weights),
+        }
+      })
+      .filter(Boolean),
+    random_bundle_groups: (n.random_bundle_groups || [])
+      .map((g) => {
+        const bundles = (g.bundles || [])
+          .map((b) => ({
+            id: b.id,
+            alias: String(b.alias || '').trim() || '未命名',
+            text: String(b.text || '').trim(),
+          }))
+          .filter((b) => b.text)
+        if (!bundles.length) return null
+        return {
+          id: g.id,
+          name: g.name,
+          enabled: !!g.enabled,
+          target: g.target,
+          pick_mode: g.pick_mode === 'sequential' ? 'sequential' : 'random',
+          bundles,
+          weights: normalizeGroupWeights(
+            bundles.map((b) => b.text),
+            g.weights,
+          ),
         }
       })
       .filter(Boolean),
@@ -275,6 +388,53 @@ export function formatGlobalRandomSummary(cfg) {
  * 一键开/关全局随机组（就地修改 cfg.random_groups，保留各组 enabled 供恢复）。
  * @returns {Record<string, boolean>|null} 关闭时返回快照；开启并恢复后返回 null
  */
+export function globalRandomBundleGroupsWithContent(cfg) {
+  const n = normalizePromptConfig(cfg)
+  return (n.random_bundle_groups || []).filter((g) =>
+    (g.bundles || []).some((b) => String(b.text || '').trim()),
+  )
+}
+
+export function globalRandomBundleGroupsActive(cfg) {
+  return globalRandomBundleGroupsWithContent(cfg).some((g) => g.enabled !== false)
+}
+
+export function formatGlobalRandomBundleSummary(cfg) {
+  const groups = globalRandomBundleGroupsWithContent(cfg)
+  const on = groups.filter((g) => g.enabled !== false).length
+  const total = groups.length
+  if (total === 0) return { text: '无词串组', active: false }
+  if (!on) return { text: '词串组已关', active: false }
+  if (on === total) return { text: `${total} 组词串已开`, active: true }
+  return { text: `${on}/${total} 组词串已开`, active: true }
+}
+
+export function applyGlobalRandomBundleGroupsMaster(cfg, enabled, snapshot = null) {
+  const groups = cfg?.random_bundle_groups
+  if (!Array.isArray(groups)) return null
+  const withContent = groups.filter((g) =>
+    (g.bundles || []).some((b) => String(b.text || '').trim()),
+  )
+  if (!enabled) {
+    const snap = {}
+    for (const g of withContent) {
+      snap[g.id] = g.enabled !== false
+      g.enabled = false
+    }
+    return snap
+  }
+  if (snapshot && typeof snapshot === 'object') {
+    for (const g of withContent) {
+      g.enabled = snapshot[g.id] !== false
+    }
+  } else {
+    for (const g of withContent) {
+      g.enabled = true
+    }
+  }
+  return null
+}
+
 export function applyGlobalRandomGroupsMaster(cfg, enabled, snapshot = null) {
   const groups = cfg?.random_groups
   if (!Array.isArray(groups)) return null

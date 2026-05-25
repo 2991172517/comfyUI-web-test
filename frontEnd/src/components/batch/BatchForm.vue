@@ -72,13 +72,6 @@ watch(
         </div>
         <div class="flex flex-wrap gap-2">
           <Button
-            variant="outline"
-            :disabled="disabled || batch.isBatchRunning || !batch.plannedTotal"
-            @click="batch.previewPlan"
-          >
-            预览计划
-          </Button>
-          <Button
             :disabled="disabled || batch.isBatchRunning || !batch.plannedTotal"
             @click="batch.startBatch"
           >

@@ -44,9 +44,13 @@ const props = defineProps({
   showLabel: { type: Boolean, default: true },
   /** 外层容器 class，如 h-full */
   blockClass: { type: String, default: '' },
+  /** 仅弹窗模式：无触发区，由父级 v-model:picker-open 控制，点选即完成 */
+  dialogOnly: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue'])
+const pickerOpen = defineModel('pickerOpen', { type: Boolean, default: false })
+
+const emit = defineEmits(['update:modelValue', 'picked'])
 
 const PREVIEW_IMAGE_SIZE = 'h-28 w-28'
 const PREVIEW_INFO_HEIGHT = 'h-28'
@@ -61,9 +65,18 @@ const query = ref('')
 const backdropRef = ref(null)
 const panelRef = ref(null)
 
-useModalMotion(open, backdropRef, panelRef)
+/** 弹窗显隐单一数据源，避免 pickerOpen ↔ open 双向 watch 引发更新死循环 */
+const modalOpen = computed({
+  get: () => (props.dialogOnly ? pickerOpen.value : open.value),
+  set: (v) => {
+    if (props.dialogOnly) pickerOpen.value = v
+    else open.value = v
+  },
+})
 
-watch(open, async (v) => {
+useModalMotion(modalOpen, backdropRef, panelRef)
+
+watch(modalOpen, async (v) => {
   if (!v) return
   await nextTick()
   const cards = panelRef.value?.querySelectorAll('[data-picker-card]')
@@ -138,23 +151,24 @@ function loraCompatHint(name) {
 }
 
 function pick(name) {
+  if (!name || name === 'None') return
   emit('update:modelValue', name)
-  open.value = false
-  query.value = ''
+  if (props.dialogOnly) emit('picked', name)
+  closePicker()
 }
 
 function openPicker() {
   if (props.disabled || props.loading) return
-  open.value = true
+  modalOpen.value = true
 }
 
 function closePicker() {
-  open.value = false
+  modalOpen.value = false
   query.value = ''
 }
 
 function onKeydown(e) {
-  if (e.key === 'Escape' && open.value) closePicker()
+  if (e.key === 'Escape' && modalOpen.value) closePicker()
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
@@ -162,7 +176,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div :class="cn('space-y-2', blockClass, stretchFill && 'flex flex-col')">
+  <div
+    v-if="!dialogOnly"
+    :class="cn('space-y-2', blockClass, stretchFill && 'flex flex-col')"
+  >
     <Label v-if="showLabel && displayLabel">{{ displayLabel }}</Label>
 
     <div
@@ -261,12 +278,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     >
       {{ loading ? '加载模型列表…' : meta.emptyPick }}
     </button>
+  </div>
 
-    <Teleport to="body">
+  <Teleport to="body">
       <div
-        v-if="open"
+        v-if="modalOpen"
         ref="backdropRef"
-        class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55"
+        :class="
+          cn(
+            'fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55',
+            dialogOnly ? 'z-[90] backdrop-blur-sm' : 'z-[80]',
+          )
+        "
         role="dialog"
         aria-modal="true"
         :aria-label="`${displayLabel} 选择器`"
@@ -395,5 +418,4 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         </div>
       </div>
     </Teleport>
-  </div>
 </template>

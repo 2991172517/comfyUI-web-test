@@ -21,7 +21,9 @@ def _empty_config() -> dict[str, Any]:
         "enabled": True,
         "positive": "",
         "negative": "",
+        "gacha_animation_enabled": True,
         "random_groups": [],
+        "random_bundle_groups": [],
         "merge": {
             "global_before_workflow": False,
             "random_before_workflow": False,
@@ -76,6 +78,21 @@ def normalize_global_config(raw: dict | None) -> dict[str, Any]:
         norm["name"] = str(g.get("name") or norm.get("name") or "参考组")
         groups.append(norm)
     cfg["random_groups"] = groups
+    cfg["gacha_animation_enabled"] = bool(raw.get("gacha_animation_enabled", True))
+    from batch_prompt_service import normalize_random_bundle_group
+
+    bundle_groups = []
+    for g in raw.get("random_bundle_groups") or []:
+        norm = normalize_random_bundle_group(g)
+        if not norm:
+            continue
+        gid = str(norm.get("id") or "")
+        if gid and not gid.startswith("global-"):
+            gid = f"global-{gid}"
+        norm["id"] = gid or f"global-bundle-{len(bundle_groups)}"
+        norm["name"] = str(g.get("name") or norm.get("name") or "词串组")
+        bundle_groups.append(norm)
+    cfg["random_bundle_groups"] = bundle_groups
     return cfg
 
 
@@ -108,6 +125,7 @@ def global_as_runtime_layers(cfg: dict | None = None) -> dict[str, Any]:
         "negative": g["negative"],
         "fixed": {"positive": {"prefix": "", "suffix": ""}, "negative": {"prefix": "", "suffix": ""}},
         "random_groups": copy.deepcopy(g["random_groups"]),
+        "random_bundle_groups": copy.deepcopy(g.get("random_bundle_groups") or []),
         "merge": copy.deepcopy(g["merge"]),
         "source": "global",
     }

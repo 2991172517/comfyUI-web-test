@@ -1,0 +1,5 @@
+{
+  "checkpoints": "",
+  "loras": "",
+  "notes": "留空表示使用 ComfyUI 默认路径（COMFYUI_ROOT/models/checkpoints|loras）"
+}

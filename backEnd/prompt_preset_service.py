@@ -110,7 +110,7 @@ def update_preset(preset_id: str, body: dict) -> dict:
         cfg = normalize_batch_prompts(merged_body)
         updated = {
             **p,
-            "name": body.get("name", p.get("name")),
+            "name": body["name"] if "name" in body else p.get("name"),
             "description": body.get("description", p.get("description", "")),
             "positive": cfg.get("positive", ""),
             "negative": cfg.get("negative", ""),

@@ -309,9 +309,16 @@ def _resolve_sweep_rules(body: dict, loras: list[dict]) -> tuple[dict, dict, dic
 
 
 def _prompt_build_kwargs(body: dict) -> dict:
+    kw: dict = {}
     if "style_enabled" in body:
-        return {"style_enabled": bool(body["style_enabled"])}
-    return {}
+        kw["style_enabled"] = bool(body["style_enabled"])
+    if "enabled_preview_node_ids" in body:
+        kw["enabled_preview_node_ids"] = [
+            str(x) for x in (body.get("enabled_preview_node_ids") or [])
+        ]
+    if body.get("lora_chain_session"):
+        kw["lora_chain_session"] = body["lora_chain_session"]
+    return kw
 
 
 def build_grid_plan(workflow_id: str, body: dict) -> dict:
@@ -432,9 +439,10 @@ def build_grid_plan(workflow_id: str, body: dict) -> dict:
             if seed_nodes:
                 for sn in seed_nodes:
                     nid = str(sn["node_id"])
+                    field = str(sn.get("seed_field") or "seed")
                     overrides[nid] = {
                         **overrides.get(nid, {}),
-                        "seed": seed,
+                        field: seed,
                     }
             elif seed_node_id:
                 overrides[str(seed_node_id)] = {
@@ -631,6 +639,7 @@ def run_batch(workflow_id: str, body: dict) -> None:
                 batch_id,
                 current_index=item["index"],
                 current_label=item["label"],
+                current_prompt_id=None,
                 message=f"正在生成 {item['index'] + 1}/{len(items)}: {item['label']}",
             )
             log.info(
@@ -650,7 +659,7 @@ def run_batch(workflow_id: str, body: dict) -> None:
                 "[batch_queue] cell=%s apply_defaults=%s layers_applied=%s picks=%d clip3_len=%d "
                 "head=%r tail=%r",
                 item["index"],
-                kw.get("apply_defaults", True),
+                kw.get("apply_defaults", False),
                 bool(item.get("prompt_layers_applied")),
                 len(item.get("prompt_picks") or []),
                 len(clip3),
@@ -694,7 +703,13 @@ def run_batch(workflow_id: str, body: dict) -> None:
             prompt_id = str(uuid.uuid4())
             result = comfy_client.queue_prompt(prompt, client_id=client_id, prompt_id=prompt_id)
             pid = result.get("prompt_id", prompt_id)
-            ws_tracker.start_tracking(client_id, pid)
+            watch_nodes = workflow_service.execution_track_node_ids(prompt)
+            ws_tracker.start_tracking(
+                client_id,
+                pid,
+                execution_node_ids=watch_nodes,
+            )
+            batch_store.update(batch_id, current_prompt_id=pid)
 
             try:
                 detail = wait_for_prompt(pid, client_id, batch_id)

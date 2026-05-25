@@ -8,6 +8,12 @@ import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
 import Alert from '@/components/ui/Alert.vue'
 import Badge from '@/components/ui/Badge.vue'
+import SelectNative from '@/components/ui/SelectNative.vue'
+import {
+  DEFAULT_WORKFLOW_CATEGORY,
+  WORKFLOW_CATEGORIES,
+  normalizeCategory,
+} from '@/lib/workflowCategories.js'
 import { cn } from '@/lib/utils'
 
 const emit = defineEmits(['imported', 'close'])
@@ -16,6 +22,7 @@ const app = useAppStore()
 const fileInputRef = ref(null)
 const file = ref(null)
 const displayName = ref('')
+const category = ref(DEFAULT_WORKFLOW_CATEGORY)
 const analyzing = ref(false)
 const importing = ref(false)
 const dragDepth = ref(0)
@@ -101,6 +108,7 @@ async function confirmImport() {
   try {
     const res = await api.importWorkflow(file.value, {
       display_name: displayName.value.trim() || undefined,
+      category: normalizeCategory(category.value),
     })
     app.setMessage(`已导入：${res.display_name}（${res.variant_id}）`)
     emit('imported', res)
@@ -152,6 +160,15 @@ defineExpose({ applyFile })
       <span v-if="file" class="mt-1 rounded-md bg-background/80 px-2 py-1 text-xs text-foreground">
         {{ file.name }}
       </span>
+    </div>
+
+    <div class="space-y-1">
+      <Label for="import-category">分类</Label>
+      <SelectNative id="import-category" v-model="category" class="w-full">
+        <option v-for="c in WORKFLOW_CATEGORIES" :key="c.id" :value="c.id">
+          {{ c.label }}
+        </option>
+      </SelectNative>
     </div>
 
     <div class="space-y-1">

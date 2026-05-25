@@ -311,6 +311,113 @@ def resolve_group_pick(
     return resolve_random_group_pick(group, rng)
 
 
+def resolve_random_bundle_pick(
+    group: dict,
+    rng: random.Random,
+) -> tuple[str, list[str], dict[str, Any]]:
+    """随机词串组：每次抽取一整组（组内全部逗号分隔词条加入提示词）。"""
+    bundles = list(group.get("bundles") or [])
+    if not bundles:
+        return "", [], {}
+
+    target = group.get("target", "positive")
+    base_rec: dict[str, Any] = {
+        "pick_type": "bundle_group",
+        "group_id": group.get("id"),
+        "group_name": group.get("name"),
+        "target": target,
+        "pick_mode": "random",
+    }
+
+    weights = _weights_for_pool(group, len(bundles))
+    idx = _weighted_index(weights, rng)
+    bundle = bundles[idx]
+    tokens = active_prompt_tokens(split_prompt_tokens(str(bundle.get("text") or "")))
+    merged = join_prompt_tokens(tokens)
+    record = {
+        **base_rec,
+        "mode": "one_bundle_all_tokens",
+        "bundle_id": bundle.get("id"),
+        "bundle_alias": bundle.get("alias") or bundle.get("name") or "",
+        "bundle_index": idx,
+        "bundle_weight": weights[idx],
+        "bundle_count": len(bundles),
+        "tokens": tokens,
+        "text": merged,
+    }
+    return merged, tokens, record
+
+
+def resolve_sequential_bundle_pick(
+    group: dict,
+    index: int,
+) -> tuple[str, list[str], dict[str, Any]]:
+    bundles = list(group.get("bundles") or [])
+    if not bundles:
+        return "", [], {}
+
+    target = group.get("target", "positive")
+    seq_index = int(index or 0)
+    idx = seq_index % len(bundles)
+    bundle = bundles[idx]
+    tokens = active_prompt_tokens(split_prompt_tokens(str(bundle.get("text") or "")))
+    merged = join_prompt_tokens(tokens)
+    record: dict[str, Any] = {
+        "pick_type": "bundle_group",
+        "group_id": group.get("id"),
+        "group_name": group.get("name"),
+        "target": target,
+        "pick_mode": "sequential",
+        "mode": "sequential_one_bundle",
+        "sequence_index": seq_index,
+        "bundle_id": bundle.get("id"),
+        "bundle_alias": bundle.get("alias") or "",
+        "bundle_index": idx,
+        "bundle_count": len(bundles),
+        "tokens": tokens,
+        "text": merged,
+    }
+    return merged, tokens, record
+
+
+def resolve_bundle_group_pick(
+    group: dict,
+    *,
+    rng: random.Random,
+    index: int = 0,
+) -> tuple[str, list[str], dict[str, Any]]:
+    mode = str(group.get("pick_mode") or "random").strip().lower()
+    if mode not in PICK_MODES:
+        mode = "random"
+    if mode == "sequential":
+        return resolve_sequential_bundle_pick(group, index)
+    return resolve_random_bundle_pick(group, rng)
+
+
+def pick_random_bundle_groups(
+    groups: list[dict],
+    *,
+    seed: int | None = None,
+    index: int = 0,
+) -> tuple[dict[str, list[str]], list[dict]]:
+    frags: dict[str, list[str]] = {"positive": [], "negative": []}
+    records: list[dict] = []
+    rng = random.Random((seed or 0) + index * 7919) if seed is not None else random
+
+    for g in groups:
+        if not g.get("enabled", True):
+            continue
+        merged, _tokens, rec = resolve_bundle_group_pick(g, rng=rng, index=index)
+        if not merged:
+            continue
+        target = rec.get("target", "positive")
+        if target not in frags:
+            target = "positive"
+        frags[target].append(merged)
+        records.append(rec)
+    return frags, records
+
+
 def pick_random_groups(
     groups: list[dict],
     *,
@@ -331,6 +438,7 @@ def pick_random_groups(
         merged, _tokens, rec = resolve_group_pick(g, rng=rng, index=index)
         if not merged:
             continue
+        rec.setdefault("pick_type", "token_group")
         target = rec.get("target", "positive")
         if target not in frags:
             target = "positive"

@@ -8,6 +8,12 @@
       "categoryId": "41"
     }
   ],
-  "tagPreferences": [],
+  "tagPreferences": [
+    {
+      "categoryId": "7835",
+      "value": "1girl",
+      "preference": "like"
+    }
+  ],
   "hiddenCategories": []
 }

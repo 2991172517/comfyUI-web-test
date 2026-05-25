@@ -1,6 +1,4 @@
 <script setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
-import { collapseOut, staggerReveal } from '@/lib/gsap/motion.js'
 import { useFavoritesPageStore } from '@/stores/useFavoritesPageStore.js'
 import Badge from '@/components/ui/Badge.vue'
 import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
@@ -12,22 +10,13 @@ import { useAppStore } from '@/stores/useAppStore.js'
 import { favoriteEntryToTogglePayload } from '@/lib/favoriteToggle.js'
 import { useImageDownload } from '@/composables/useImageDownload.js'
 import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
+import InpaintJumpButton from '@/components/inpaint/InpaintJumpButton.vue'
+import { buildInpaintPayloadFromFavorite } from '@/lib/inpaintBootstrap.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 
 const emit = defineEmits(['preview'])
 
-const gridRef = ref(null)
 const fav = useFavoritesPageStore()
-
-async function revealList() {
-  await nextTick()
-  const items = gridRef.value?.querySelectorAll('[data-stagger-item]')
-  if (!items?.length) return
-  staggerReveal(items, { duration: 0.16, stagger: 0.018 })
-}
-
-onMounted(revealList)
-watch(() => fav.records.length, revealList)
 const app = useAppStore()
 const { saveOne } = useImageDownload()
 const { confirmDelete } = useConfirmDialog()
@@ -64,18 +53,15 @@ async function remove(ev, f) {
     }))
   )
     return
-  const card = ev.currentTarget?.closest?.('[data-stagger-item]')
   try {
     const body = favoriteEntryToTogglePayload(f)
     if (!body?.image?.filename) {
       app.setMessage('无法取消收藏：缺少图片信息', true)
       return
     }
-    if (card) await collapseOut(card)
     await api.toggleFavorite(body)
     fav.removeFromList(f.id)
     app.setMessage('已取消收藏')
-    revealList()
   } catch (e) {
     app.setMessage(e.message, true)
   }
@@ -95,15 +81,15 @@ async function remove(ev, f) {
   >
     暂无收藏。在抽卡结果、批量网格或历史记录中点击 ☆ 收藏。
   </p>
-  <div
+  <TransitionGroup
     v-else
-    ref="gridRef"
+    tag="div"
+    name="fav-card"
     class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
   >
     <article
       v-for="f in fav.records"
       :key="f.id"
-      data-stagger-item
       :class="
         cn(
           'group cursor-pointer overflow-visible rounded-xl border-2 bg-card transition-[box-shadow,border-color] duration-200 hover:shadow-md',
@@ -142,8 +128,13 @@ async function remove(ev, f) {
           {{ favoriteSourceLabel(f) }}
         </Badge>
         <div
-          class="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100"
+          class="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100"
         >
+          <InpaintJumpButton
+            v-if="f.image?.url"
+            size="sm"
+            :get-payload="() => buildInpaintPayloadFromFavorite(f)"
+          />
           <button
             v-if="f.image?.url"
             type="button"
@@ -185,5 +176,14 @@ async function remove(ev, f) {
         <p class="text-[10px] text-muted-foreground">{{ formatTime(f.created_at) }}</p>
       </div>
     </article>
-  </div>
+  </TransitionGroup>
 </template>
+
+<style scoped>
+.fav-card-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fav-card-leave-to {
+  opacity: 0;
+}
+</style>

@@ -9,6 +9,7 @@ from pathlib import Path
 from config import VOCABULARY_DB_PATH, VOCABULARY_MANIFEST_PATH, VOCABULARY_USER_PATH
 
 from . import index
+from .merge import merge_into_main_manifest, parse_upload_bytes
 
 log = logging.getLogger("custom_project.vocabulary")
 
@@ -75,3 +76,56 @@ def resolve(values: list[str]) -> dict:
     items = index.resolve_values(Path(VOCABULARY_DB_PATH), values)
     took_ms = int((time.perf_counter() - t0) * 1000)
     return {"items": items, "tookMs": took_ms}
+
+
+def merge_manifest_upload(
+    raw: bytes,
+    *,
+    dry_run: bool = False,
+    rebuild_index: bool = True,
+) -> dict:
+    """
+    将上传 JSON 并入主 manifest，并按需重建 vocabulary.db。
+    无需重启后端；合并完成后索引即更新。
+    """
+    incoming = parse_upload_bytes(raw)
+    manifest_path = Path(VOCABULARY_MANIFEST_PATH)
+    payload, merged = merge_into_main_manifest(
+        incoming,
+        manifest_path,
+        dry_run=dry_run,
+    )
+    if not dry_run and rebuild_index:
+        ensure_index(force=True)
+        payload["rebuilt"] = True
+        payload["indexStats"] = index_stats()
+    elif dry_run:
+        payload["preview"] = {
+            "mergedCategories": payload["stats"].get("merged_categories"),
+            "mergedPrompts": payload["stats"].get("merged_prompts"),
+        }
+    else:
+        payload["indexStats"] = index_stats()
+    return payload
+
+
+def merge_manifest_json(
+    data: dict,
+    *,
+    dry_run: bool = False,
+    rebuild_index: bool = True,
+) -> dict:
+    from .merge import validate_manifest_payload
+
+    incoming = validate_manifest_payload(data)
+    manifest_path = Path(VOCABULARY_MANIFEST_PATH)
+    payload, _merged = merge_into_main_manifest(
+        incoming,
+        manifest_path,
+        dry_run=dry_run,
+    )
+    if not dry_run and rebuild_index:
+        ensure_index(force=True)
+        payload["rebuilt"] = True
+        payload["indexStats"] = index_stats()
+    return payload

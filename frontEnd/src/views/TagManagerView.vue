@@ -14,6 +14,7 @@ import {
 } from 'lucide-vue-next'
 import PageAlert from '@/components/layout/PageAlert.vue'
 import TagCategoryTree from '@/components/prompt/TagCategoryTree.vue'
+import VocabularyMergePanel from '@/components/prompt/VocabularyMergePanel.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import { cn } from '@/lib/utils'
@@ -389,10 +390,14 @@ onMounted(async () => {
       {{ errorMsg }}
     </p>
 
+    <VocabularyMergePanel @merged="loadTree" />
+
     <div
-      class="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-3 md:flex-row md:min-h-[32rem] md:items-stretch"
+      class="flex min-h-[20rem] max-h-[calc(100dvh-13rem)] flex-col gap-4 overflow-hidden rounded-lg border border-border bg-card/40 p-3 md:flex-row md:min-h-[28rem] md:items-stretch"
     >
-      <aside class="w-full shrink-0 md:w-56 lg:w-64 flex flex-col min-h-0">
+      <aside
+        class="flex w-full max-h-[42vh] shrink-0 flex-col min-h-0 md:max-h-none md:h-full md:w-56 lg:w-64"
+      >
         <p class="mb-2 text-xs font-medium text-muted-foreground">
           分类（hover 可删组）
         </p>
@@ -416,7 +421,7 @@ onMounted(async () => {
         </p>
         <div
           v-else
-          class="flex-1 min-h-0 max-h-[28rem] overflow-y-auto pr-1"
+          class="min-h-0 flex-1 overflow-y-auto pr-1"
         >
           <TagCategoryTree
             :nodes="filteredTree"
@@ -430,7 +435,7 @@ onMounted(async () => {
         </div>
       </aside>
 
-      <main class="min-w-0 flex-1 flex flex-col gap-3 min-h-0">
+      <main class="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
         <div
           class="rounded-md border border-border/60 bg-muted/20 p-3"
         >

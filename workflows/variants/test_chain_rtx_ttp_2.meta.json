@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "variant_id": "test_chain_rtx_ttp_2",
+  "display_name": "test_chain_rtx_ttp",
+  "style_enabled": false,
+  "style_enabled_default": false,
+  "topology": {
+    "checkpoint_node": "1",
+    "clip_set_last_layer": "2",
+    "lora_slots": [
+      {
+        "node_id": "12",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "lazypos"
+      },
+      {
+        "node_id": "16",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "nyalia"
+      },
+      {
+        "node_id": "18",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "takayanagi"
+      },
+      {
+        "node_id": "19",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "bikabaka"
+      },
+      {
+        "node_id": "23",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "Matte Skin"
+      },
+      {
+        "node_id": "24",
+        "role": "character",
+        "kind": "lora_chain",
+        "optional": false,
+        "sweepable": true,
+        "title": "Kidmo"
+      },
+      {
+        "node_id": "25",
+        "role": "style",
+        "kind": "lora_chain",
+        "optional": true,
+        "sweepable": true,
+        "title": "CutePastel / c7ilf"
+      }
+    ],
+    "positive_encode": {
+      "node_id": "3",
+      "clip_source_node": "25"
+    },
+    "negative_encode": {
+      "node_id": "4",
+      "clip_source_node": "25"
+    },
+    "ksampler_pass1": "5",
+    "ksampler_pass2": "14",
+    "save_image": "8",
+    "style_bypass_when_disabled": {
+      "node_id": "25",
+      "fallback_node_id": "24",
+      "rewire": [
+        {
+          "target_node": "4",
+          "input_key": "clip",
+          "source": [
+            "24",
+            1
+          ]
+        }
+      ]
+    },
+    "future_conditioning_style": {
+      "enabled": false
+    }
+  },
+  "import_source": "json",
+  "import_original_format": "api",
+  "category": "generate",
+  "description": "对齐究极 Lora 堆（7 个）：lazypos→nyalia→takayanagi→bikabaka→Matte_Skin→Kidmo→CutePastel。 一采 Adv → RTX → TTP 二采 → RTX 终放大。"
+}

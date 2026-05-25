@@ -1,7 +1,5 @@
 {
   "schema_version": 1,
-  "template_id": "First_api",
-  "is_master": false,
   "variant_id": "test_chain_edit",
   "display_name": "链测试",
   "style_enabled": false,
@@ -51,5 +49,6 @@
         "ApplyStyleModel"
       ]
     }
-  }
+  },
+  "category": "generate"
 }

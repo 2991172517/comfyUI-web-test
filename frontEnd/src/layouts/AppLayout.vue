@@ -2,22 +2,14 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import AnimatedRouterView from '@/components/layout/AnimatedRouterView.vue'
-import {
-  Sparkles,
-  History,
-  Star,
-  Activity,
-  Layers,
-  GitBranch,
-  ListTodo,
-  Boxes,
-  KeyRound,
-  Tags,
-} from 'lucide-vue-next'
+import { Activity, Layers } from 'lucide-vue-next'
+import AppNav from '@/components/layout/AppNav.vue'
 import { api } from '@/api/client.js'
-import { allowsBatch, authRole, getAccessToken, isAdmin, setAuthSession } from '@/composables/useAuth.js'
+import { getAccessToken, setAuthSession } from '@/composables/useAuth.js'
 import { createAppStore } from '@/stores/useAppStore.js'
 import { createBatchStore } from '@/stores/useBatchStore.js'
+import { createGenerateQueueWithApp } from '@/stores/useGenerateQueueStore.js'
+import GenerateQueueDock from '@/components/layout/GenerateQueueDock.vue'
 import { createHistoryStore } from '@/stores/useHistoryStore.js'
 import { createFavoritesPageStore } from '@/stores/useFavoritesPageStore.js'
 import Badge from '@/components/ui/Badge.vue'
@@ -27,6 +19,7 @@ import GlobalPromptSettingsModal from '@/components/prompt/GlobalPromptSettingsM
 import ModelImportModal from '@/components/models/ModelImportModal.vue'
 import ConfirmDialogHost from '@/components/ui/ConfirmDialogHost.vue'
 import RandomGachaHost from '@/components/effects/RandomGachaHost.vue'
+import AppToastHost from '@/components/layout/AppToastHost.vue'
 import FireflyEcosystemBackground from '@/components/background/FireflyEcosystemBackground.vue'
 import { provideConfirmDialog } from '@/composables/useConfirmDialog.js'
 import { provideRandomGachaOverlay } from '@/composables/useRandomGachaOverlay.js'
@@ -36,6 +29,7 @@ provideConfirmDialog()
 provideRandomGachaOverlay()
 const app = createAppStore()
 const batch = createBatchStore(app)
+createGenerateQueueWithApp(app, batch)
 const history = createHistoryStore()
 createFavoritesPageStore()
 const route = useRoute()
@@ -65,27 +59,6 @@ onMounted(async () => {
   await history.loadFilterOptions()
 })
 
-const nav = computed(() => {
-  void authRole.value
-  const items = [
-    { to: '/generate', label: '生成', icon: Sparkles },
-    ...(allowsBatch()
-      ? [
-          { to: '/workflows', label: '工作流配置', icon: GitBranch },
-          { to: '/campaign', label: '任务计划', icon: ListTodo },
-        ]
-      : []),
-    { to: '/history', label: '历史记录', icon: History },
-    { to: '/favorites', label: '收藏', icon: Star },
-    { to: '/models', label: '模型管理', icon: Boxes },
-    { to: '/settings/tags', label: 'Tag 显示管理', icon: Tags },
-  ]
-  if (isAdmin()) {
-    items.push({ to: '/admin/invites', label: '邀请码管理', icon: KeyRound })
-  }
-  return items
-})
-
 const pageTitle = computed(() => route.meta?.title || '控制台')
 /** 生成页在内容区自带模式说明，避免顶栏副标题随模式切换伸缩 */
 const pageDesc = computed(() =>
@@ -112,23 +85,7 @@ const isFullBleed = computed(() => !!route.meta?.fullBleed)
           <span class="hidden text-sm font-semibold sm:inline">ComfyUI 控制台</span>
         </RouterLink>
 
-        <nav class="flex flex-1 items-center gap-1 overflow-x-auto">
-          <RouterLink
-            v-for="item in nav"
-            :key="item.to"
-            :to="item.to"
-            :class="
-              cn(
-                'flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors',
-                'text-muted-foreground hover:bg-accent hover:text-foreground',
-              )
-            "
-            active-class="!bg-primary/15 !text-primary font-medium"
-          >
-            <component :is="item.icon" class="h-4 w-4 shrink-0" />
-            {{ item.label }}
-          </RouterLink>
-        </nav>
+        <AppNav />
 
         <div class="flex shrink-0 items-center gap-2">
           <Badge :variant="app.healthOk ? 'success' : 'destructive'" class="gap-1">
@@ -169,6 +126,8 @@ const isFullBleed = computed(() => !!route.meta?.fullBleed)
     <ModelImportModal />
     <ConfirmDialogHost />
     <RandomGachaHost />
+    <AppToastHost />
+    <GenerateQueueDock />
     </div>
   </div>
 </template>

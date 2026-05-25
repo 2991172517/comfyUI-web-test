@@ -15,6 +15,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import ModelNodeCard from '@/components/models/ModelNodeCard.vue'
 import ModelManifestToolbar from '@/components/models/ModelManifestToolbar.vue'
+import ModelPathSettings from '@/components/models/ModelPathSettings.vue'
 import { cn } from '@/lib/utils'
 
 const app = useAppStore()
@@ -44,6 +45,11 @@ const filteredLoras = computed(() => {
   if (!q) return loras.value
   return loras.value.filter((l) => l.name.toLowerCase().includes(q))
 })
+
+async function reloadCatalog() {
+  await load()
+  await app.loadModelLists().catch(() => {})
+}
 
 async function load() {
   loading.value = true
@@ -131,6 +137,8 @@ onMounted(() => load().catch((e) => app.setMessage(e.message, true)))
 <template>
   <div class="space-y-4 max-w-6xl mx-auto">
     <PageAlert />
+
+    <ModelPathSettings @saved="reloadCatalog" />
 
     <Card>
       <CardHeader>

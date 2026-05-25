@@ -18,10 +18,19 @@ def get(batch_id: str) -> dict | None:
 
 
 def update(batch_id: str, **fields: Any) -> None:
+    snapshot = None
     with _lock:
         if batch_id not in _batches:
             return
         _batches[batch_id].update(fields)
+        snapshot = dict(_batches[batch_id])
+    if snapshot is not None:
+        try:
+            import job_events_hub
+
+            job_events_hub.broadcast_batch_sync(batch_id, snapshot)
+        except Exception:
+            pass
 
 
 def set_cancelled(batch_id: str) -> None:

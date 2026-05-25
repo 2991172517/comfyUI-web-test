@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import comfy_client
+import model_paths_service
 from config import PROJECT_ROOT
 
 MODEL_NODE_DEFAULTS_PATH = PROJECT_ROOT / "config" / "model_node_defaults.json"
@@ -90,6 +91,9 @@ def _migrate_legacy_workflow_defaults(store: dict) -> None:
 
 
 def _list_local_models(folder: str) -> list[str]:
+    scanned = model_paths_service.list_model_filenames(folder)
+    if scanned:
+        return scanned
     try:
         files = comfy_client.list_models(folder)
         return sorted(str(x) for x in files if x)

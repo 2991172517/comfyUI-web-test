@@ -8,6 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import model_paths_service
 from model_preview_service import VALID_FOLDERS, models_folder_dir
 
 log = logging.getLogger("custom_project.model_folder")
@@ -22,7 +23,7 @@ def resolve_model_folder(folder: str) -> Path:
 
 
 def list_folder_paths() -> dict[str, str]:
-    return {name: str(resolve_model_folder(name)) for name in sorted(VALID_FOLDERS)}
+    return model_paths_service.get_settings_response()["resolved"]
 
 
 def _win_bring_to_front(hwnd: int) -> bool:

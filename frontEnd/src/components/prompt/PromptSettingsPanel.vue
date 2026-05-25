@@ -1,9 +1,11 @@
 <script setup>
-import { onUnmounted, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Tags } from 'lucide-vue-next'
 import GlobalPromptEditorPanel from '@/components/prompt/GlobalPromptEditorPanel.vue'
 import GlobalRandomGroupsPanel from '@/components/prompt/GlobalRandomGroupsPanel.vue'
+import GlobalRandomBundleGroupsPanel from '@/components/prompt/GlobalRandomBundleGroupsPanel.vue'
+import GlobalGachaAnimationSetting from '@/components/prompt/GlobalGachaAnimationSetting.vue'
 import PromptPresetManager from '@/components/prompt/PromptPresetManager.vue'
 import {
   PROMPT_EDITOR_MODE_OPTIONS,
@@ -20,31 +22,44 @@ const { mode: editorMode } = usePromptEditorMode()
 
 const globalPanelRef = ref(null)
 const randomPanelRef = ref(null)
+const bundlePanelRef = ref(null)
+const gachaPanelRef = ref(null)
 const presetPanelRef = ref(null)
 
 const tabs = [
   { id: 'global', label: '全局提示词' },
-  { id: 'random', label: '随机提示词组' },
+  { id: 'random', label: '随机词组' },
+  { id: 'bundles', label: '随机词串组' },
   { id: 'presets', label: '提示词预设' },
 ]
 
-async function flushPendingSaves() {
-  await Promise.all([
-    globalPanelRef.value?.flush?.(),
-    randomPanelRef.value?.flush?.(),
-    presetPanelRef.value?.flush?.(),
-  ])
+async function flushActiveTab() {
+  const tab = activeTab.value
+  if (tab === 'global') await globalPanelRef.value?.flush?.()
+  else if (tab === 'random') await randomPanelRef.value?.flush?.()
+  else if (tab === 'bundles') await bundlePanelRef.value?.flush?.()
+  else if (tab === 'gacha') await gachaPanelRef.value?.flush?.()
+  else if (tab === 'presets') await presetPanelRef.value?.flush?.()
 }
 
-defineExpose({ flushPendingSaves })
+async function flushPendingSaves() {
+  await gachaPanelRef.value?.flush?.()
+  await flushActiveTab()
+}
 
-onUnmounted(() => {
-  void flushPendingSaves()
-})
+async function switchTab(id) {
+  if (id === activeTab.value) return
+  await flushActiveTab()
+  activeTab.value = id
+}
+
+defineExpose({ flushPendingSaves, flushActiveTab })
 </script>
 
 <template>
   <div class="space-y-4">
+    <GlobalGachaAnimationSetting ref="gachaPanelRef" />
+
     <div class="rounded-lg border border-border bg-muted/15 p-3 space-y-2">
       <p class="text-xs font-medium text-foreground">提示词输入模式（全局）</p>
       <div class="flex flex-wrap gap-2">
@@ -97,7 +112,7 @@ onUnmounted(() => {
               : 'text-muted-foreground hover:text-foreground',
           )
         "
-        @click="activeTab = t.id"
+        @click="switchTab(t.id)"
       >
         {{ t.label }}
       </button>
@@ -105,12 +120,13 @@ onUnmounted(() => {
 
     <div :class="compact ? '' : 'rounded-lg border border-border bg-card p-4 md:p-6'">
       <GlobalPromptEditorPanel
+        v-if="activeTab === 'global'"
         ref="globalPanelRef"
-        v-show="activeTab === 'global'"
         :compact="compact"
       />
-      <GlobalRandomGroupsPanel ref="randomPanelRef" v-show="activeTab === 'random'" />
-      <PromptPresetManager ref="presetPanelRef" v-show="activeTab === 'presets'" embedded />
+      <GlobalRandomGroupsPanel v-else-if="activeTab === 'random'" ref="randomPanelRef" />
+      <GlobalRandomBundleGroupsPanel v-else-if="activeTab === 'bundles'" ref="bundlePanelRef" />
+      <PromptPresetManager v-else-if="activeTab === 'presets'" ref="presetPanelRef" embedded />
     </div>
   </div>
 </template>

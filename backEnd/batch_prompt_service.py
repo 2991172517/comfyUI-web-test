@@ -23,6 +23,7 @@ def _empty_config() -> dict:
             "negative": {"prefix": "", "suffix": ""},
         },
         "random_groups": [],
+        "random_bundle_groups": [],
     }
 
 
@@ -100,7 +101,53 @@ def normalize_batch_prompts(raw: dict | None) -> dict:
         if norm:
             groups.append(norm)
     cfg["random_groups"] = groups
+    bundle_groups = []
+    for g in raw.get("random_bundle_groups") or []:
+        norm = normalize_random_bundle_group(g)
+        if norm:
+            bundle_groups.append(norm)
+    cfg["random_bundle_groups"] = bundle_groups
     return cfg
+
+
+def normalize_random_bundle(item: dict) -> dict | None:
+    text = str(item.get("text") or "").strip()
+    if not text:
+        prompts = [str(p).strip() for p in (item.get("prompts") or []) if str(p).strip()]
+        if prompts:
+            from reference_pick_service import join_prompt_tokens
+
+            text = join_prompt_tokens(prompts)
+    if not text:
+        return None
+    alias = str(item.get("alias") or "").strip()
+    return {
+        "id": str(item.get("id") or uuid.uuid4().hex[:8]),
+        "alias": alias or "未命名",
+        "text": text,
+    }
+
+
+def normalize_random_bundle_group(g: dict) -> dict | None:
+    bundles: list[dict] = []
+    for b in g.get("bundles") or []:
+        norm = normalize_random_bundle(b)
+        if norm:
+            bundles.append(norm)
+    if not bundles:
+        return None
+    mode = str(g.get("pick_mode") or "random").strip().lower()
+    if mode not in PICK_MODES:
+        mode = "random"
+    return {
+        "id": str(g.get("id") or uuid.uuid4().hex[:8]),
+        "name": str(g.get("name") or "未命名词串组"),
+        "enabled": bool(g.get("enabled", True)),
+        "target": g.get("target") if g.get("target") in ("positive", "negative") else "positive",
+        "pick_mode": mode,
+        "bundles": bundles,
+        "weights": _normalize_group_weights([b["text"] for b in bundles], g.get("weights")),
+    }
 
 
 def apply_batch_prompt_layers(

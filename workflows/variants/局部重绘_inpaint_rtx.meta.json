@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "variant_id": "局部重绘_inpaint_rtx",
+  "display_name": "局部重绘 + RTX 1.5x",
+  "style_enabled": false,
+  "style_enabled_default": false,
+  "topology": {
+    "checkpoint_node": "1",
+    "clip_set_last_layer": "2",
+    "lora_slots": [],
+    "positive_encode": {
+      "node_id": "3",
+      "clip_source_node": "2"
+    },
+    "negative_encode": {
+      "node_id": "4",
+      "clip_source_node": "2"
+    },
+    "ksampler_pass1": "30",
+    "save_image": "50"
+  },
+  "import_source": "handwritten",
+  "import_original_format": "api",
+  "category": "inpaint"
+}

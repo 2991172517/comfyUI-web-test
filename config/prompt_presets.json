@@ -3,26 +3,49 @@
   "presets": [
     {
       "id": "226d2df3",
-      "name": "测试预设",
+      "name": "同期",
       "description": "",
       "fixed": {
         "positive": {
-          "prefix": "masterpiece, best quality, absurdres, 1girl, solo, (mature big sister:1.25), (gentle onee-san:1.2), elegant mature woman, golden blonde long hair, side-swept hair covering one eye, green eyes, droopy eyes, teasing smile, voluptuous figure, large breasts, tight clothes, slim narrow waist, gently wide hips, (long slender legs:1.2), tall body proportion, beautiful leg curves, black off-shoulder nun dress, exposed shoulders, tight robe, long black skirt with side slit, golden crucifix necklace, standing gracefully, slight contrapposto, thighhighs, window light, soft fabric texture, from below, full body centered, simple background",
+          "prefix": "",
           "suffix": ""
         },
         "negative": {
-          "prefix": "lowres, worst quality, blurry, deformed, bad anatomy, extra fingers, bad hands, cropped, close-up, upper body, huge breasts, ugly, messy background",
+          "prefix": "",
           "suffix": ""
         }
       },
       "random_groups": [],
-      "updated_at": "2026-05-24T11:24:19.967184+00:00",
-      "positive": "",
-      "negative": "",
+      "updated_at": "2026-05-25T16:06:52.148171+00:00",
+      "positive": "best quality, masterpiece, lazypos, very awa, dynamic tension, playful, highres, flat color, outline, long toes, slender toes, thin toes, delicate thin feet, gracefully aligned toes, depth of field, vibrant colors, delicate, dreamy, skindentationill, skindentation, deep skin, transparent_background, (no shadow:1.2), (white_background:1.2), simple background, (full_shot), dynamic angle, Flatline, best eyes, (sexy pose:1.1), c7ilf, dynamic shot, douki-chan (douki-chan), ganbare douki-chan, 1girl, office lady, brown eyes, brown hair, short hair, sidelocks, short ponytail, blue shirt, no shoes, blush, thighhighs, stirrup legwear, looking at viewer, slim_waist, stylish_pose, (feet focus:1.2), smile, knees_to_chest, stting, side view, toe scrunch, hands on feet",
+      "negative": "lazyneg, low quality, lowres, worstquality, long body, disconnected limbs, extra limb, malformed limbs, missing limb, floating limbs, extra arms, mutated hands, poorly drawn hands, mutated hands and fingers, missing fingers, fused fingers, too many fingers, extra legs, bad feet, lace-trimmed_legwear, fisheye, foreshortening, logo, text, bad proportions, username, signature, watermark, censored, mosaic_censoring, leather, old, elder, WIDE FEET, thick toes, deformed feet, poorly drawn feet",
       "merge": {
         "global_before_workflow": false,
         "random_before_workflow": true
       }
+    },
+    {
+      "id": "2c31dc58",
+      "name": "新预设",
+      "description": "",
+      "positive": "",
+      "negative": "",
+      "fixed": {
+        "positive": {
+          "prefix": "",
+          "suffix": ""
+        },
+        "negative": {
+          "prefix": "",
+          "suffix": ""
+        }
+      },
+      "random_groups": [],
+      "merge": {
+        "global_before_workflow": false,
+        "random_before_workflow": false
+      },
+      "updated_at": "2026-05-25T12:43:02.561140+00:00"
     }
   ]
 }

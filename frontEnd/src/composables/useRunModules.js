@@ -5,6 +5,7 @@ export const RUN_MODULES = [
   { id: 'lora', label: 'LoRA' },
   // Style 模块暂时隐藏
   { id: 'other', label: '其他' },
+  { id: 'preview', label: '总体预览' },
 ]
 
 export function otherNodeGroups(groupedNodes) {

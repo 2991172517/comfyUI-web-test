@@ -4,7 +4,15 @@ import { animateBatchCellImage, resetBatchCellSeen } from '@/lib/gsap/batchCell.
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
-import { encodeWorkflowSnapshot, persistRestoreSnapshot } from '@/lib/workflowRestore.js'
+import { buildRegenerateRestoreRoute } from '@/lib/regenerateFromImage.js'
+import {
+  historyBatchCellImageHeight,
+  historyBatchMatrixGridStyle,
+  historyCardImgClass,
+  historyCardIsNatural,
+  historyCardLayout,
+  historyCardThumbBoxStyle,
+} from '@/composables/useHistoryCardLayout.js'
 import Card from '@/components/ui/Card.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import CardTitle from '@/components/ui/CardTitle.vue'
@@ -12,17 +20,16 @@ import CardDescription from '@/components/ui/CardDescription.vue'
 import CardContent from '@/components/ui/CardContent.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import Label from '@/components/ui/Label.vue'
+import MediaCardLayoutControls from '@/components/shared/MediaCardLayoutControls.vue'
 import FavoriteStar from '@/components/FavoriteStar.vue'
+import InpaintJumpButton from '@/components/inpaint/InpaintJumpButton.vue'
+import { buildInpaintPayloadFromBatchCell } from '@/lib/inpaintBootstrap.js'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
 import { cn } from '@/lib/utils'
 
-const STORAGE_KEY = 'batch-grid-cell-size'
-
 const props = defineProps({
   showSizeControls: { type: Boolean, default: false },
-  initialCellSize: { type: Number, default: 160 },
   showMeta: { type: Boolean, default: true },
 })
 
@@ -34,44 +41,23 @@ const router = useRouter()
 const lightboxRef = ref(null)
 
 async function regenerateFromCell(cell) {
-  const snap = batch.workflowSnapshotForCell(cell)
-  if (!snap?.workflow_id && !batch.runConfig.value?.workflow_id) {
-    app.setMessage('缺少工作流信息，无法恢复', true)
-    return
+  try {
+    const route = await buildRegenerateRestoreRoute({
+      cell,
+      runConfig: batch.runConfig.value,
+      batchId: batch.batch.batchId,
+      cellIndex: cell.index,
+    })
+    if (!route) {
+      app.setMessage('缺少工作流信息，无法恢复', true)
+      return
+    }
+    if (route.message) app.setMessage(route.message)
+    router.push({ path: '/generate', query: route.query })
+  } catch (e) {
+    app.setMessage(e.message || '无法从图片恢复工作流', true)
   }
-  const wid = snap.workflow_id || batch.runConfig.value?.workflow_id
-  const encoded = encodeWorkflowSnapshot(snap)
-  const restoreKey = persistRestoreSnapshot(batch.batch.batchId, cell.index, snap)
-  const query = { workflow: wid }
-  if (restoreKey) {
-    query.restoreKey = restoreKey
-  }
-  if (encoded && encoded.length < 2400) {
-    query.restore = encoded
-  } else if (!restoreKey) {
-    app.setMessage('快照过大且无法缓存，请刷新后重试', true)
-    return
-  }
-  router.push({ path: '/generate', query })
 }
-
-function readStoredSize() {
-  const n = Number(localStorage.getItem(STORAGE_KEY))
-  return Number.isFinite(n) && n >= 64 && n <= 480 ? n : props.initialCellSize
-}
-
-const cellSize = ref(readStoredSize())
-
-const sizePresets = [
-  { label: '小', value: 96 },
-  { label: '中', value: 140 },
-  { label: '大', value: 200 },
-  { label: '特大', value: 280 },
-]
-
-watch(cellSize, (v) => {
-  localStorage.setItem(STORAGE_KEY, String(Math.round(v)))
-})
 
 watch(
   () => batch.batch.batchId,
@@ -94,11 +80,17 @@ watch(
   },
 )
 
-const gridStyle = computed(() => ({
-  gridTemplateColumns: `2.75rem repeat(${batch.gridCells.cols}, ${cellSize.value}px)`,
-}))
+const gridStyle = computed(() =>
+  historyBatchMatrixGridStyle(batch.gridCells.cols),
+)
 
-const imageHeight = computed(() => Math.max(64, cellSize.value - (props.showMeta ? 36 : 0)))
+const cellWidthPx = computed(() => historyCardLayout.cardWidth)
+
+const imageBoxStyle = computed(() => {
+  const h = historyBatchCellImageHeight.value
+  if (h == null) return { minHeight: '4rem' }
+  return { height: `${h}px` }
+})
 
 function openBatchImagePreview(cell) {
   const img = batch.cellImage(cell)
@@ -127,34 +119,7 @@ function openBatchImagePreview(cell) {
           </Badge>
         </div>
 
-        <div
-          v-if="showSizeControls"
-          class="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2"
-        >
-          <Label class="text-xs text-muted-foreground shrink-0">缩略图尺寸</Label>
-          <div class="flex gap-1">
-            <Button
-              v-for="p in sizePresets"
-              :key="p.value"
-              type="button"
-              :variant="cellSize === p.value ? 'default' : 'outline'"
-              size="sm"
-              class="h-7 min-w-9 px-2 text-xs"
-              @click="cellSize = p.value"
-            >
-              {{ p.label }}
-            </Button>
-          </div>
-          <input
-            v-model.number="cellSize"
-            type="range"
-            min="64"
-            max="480"
-            step="8"
-            class="h-2 w-28 cursor-pointer accent-primary"
-          />
-          <span class="w-12 text-right font-mono text-xs text-muted-foreground">{{ cellSize }}px</span>
-        </div>
+        <MediaCardLayoutControls v-if="showSizeControls" compact />
       </div>
     </CardHeader>
 
@@ -167,7 +132,7 @@ function openBatchImagePreview(cell) {
               v-for="ib in batch.gridCells.cols"
               :key="'h' + ib"
               class="flex items-center justify-center rounded-md bg-muted py-1 text-center text-xs font-medium text-muted-foreground"
-              :style="{ width: cellSize + 'px' }"
+              :style="{ width: cellWidthPx + 'px' }"
             >
               B{{ ib - 1 }}
             </div>
@@ -181,28 +146,42 @@ function openBatchImagePreview(cell) {
                 v-for="(cell, ib) in row"
                 :key="'c' + ia + '-' + ib"
                 :data-batch-cell="cell ? `c-${cell.index ?? `${ia}-${ib}`}` : undefined"
-                class="overflow-visible rounded-md border border-border bg-background"
-                :style="{ width: cellSize + 'px' }"
+                class="overflow-visible rounded-md border border-border bg-background w-full"
+                :style="{ width: cellWidthPx + 'px', maxWidth: cellWidthPx + 'px' }"
               >
                 <template v-if="cell && batch.cellImage(cell)">
                   <div
-                    class="relative overflow-hidden rounded-t-md bg-black/40"
-                    :style="{ height: imageHeight + 'px' }"
+                    class="relative overflow-hidden rounded-t-md bg-black/40 flex items-center justify-center"
+                    :class="historyCardIsNatural ? '' : ''"
+                    :style="[imageBoxStyle, historyCardIsNatural ? {} : historyCardThumbBoxStyle]"
                   >
                     <ImageMagnifierPreview
-                      fill
+                      :fill="!historyCardIsNatural"
                       :src="batch.cellImage(cell).url"
+                      :img-class="historyCardImgClass"
+                      :root-class="historyCardIsNatural ? 'relative w-full' : ''"
                       @click="openBatchImagePreview(cell)"
                     >
                       <template #overlay>
-                        <FavoriteStar
-                          v-if="batch.batchFavoritePayload(cell)"
-                          :payload="batch.batchFavoritePayload(cell)"
-                          size="small"
-                          class="absolute right-1 top-1 z-10"
-                          @click.stop
-                          @toggled="emit('favorite-toggled', $event)"
-                        />
+                        <div class="absolute right-1 top-1 z-10 flex gap-0.5">
+                          <InpaintJumpButton
+                            size="sm"
+                            :get-payload="
+                              () =>
+                                buildInpaintPayloadFromBatchCell(
+                                  cell,
+                                  batch.runConfig.value,
+                                )
+                            "
+                          />
+                          <FavoriteStar
+                            v-if="batch.batchFavoritePayload(cell)"
+                            :payload="batch.batchFavoritePayload(cell)"
+                            size="small"
+                            @click.stop
+                            @toggled="emit('favorite-toggled', $event)"
+                          />
+                        </div>
                       </template>
                     </ImageMagnifierPreview>
                   </div>
@@ -211,7 +190,7 @@ function openBatchImagePreview(cell) {
                     :class="
                       cn(
                         'space-y-0.5 border-t border-border/50 p-1.5 text-muted-foreground',
-                        cellSize < 120 ? 'text-[9px]' : 'text-[10px]',
+                        cellWidthPx < 120 ? 'text-[9px]' : 'text-[10px]',
                       )
                     "
                   >
@@ -229,7 +208,7 @@ function openBatchImagePreview(cell) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        :class="cn('h-6 px-2', cellSize < 120 && 'h-5 px-1 text-[9px]')"
+                        :class="cn('h-6 px-2', cellWidthPx < 120 && 'h-5 px-1 text-[9px]')"
                         @click.stop="regenerateFromCell(cell)"
                       >
                         以此生成
@@ -237,7 +216,7 @@ function openBatchImagePreview(cell) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        :class="cn('h-6 px-2', cellSize < 120 && 'h-5 px-1 text-[9px]')"
+                        :class="cn('h-6 px-2', cellWidthPx < 120 && 'h-5 px-1 text-[9px]')"
                         @click.stop="batch.downloadImage(batch.cellImage(cell))"
                       >
                         保存
@@ -248,14 +227,14 @@ function openBatchImagePreview(cell) {
                 <span
                   v-else-if="cell"
                   class="flex items-center justify-center text-xs text-muted-foreground"
-                  :style="{ height: imageHeight + 'px', minHeight: '4rem' }"
+                  :style="imageBoxStyle"
                 >
                   {{ cell.status }}
                 </span>
                 <span
                   v-else
                   class="flex items-center justify-center text-muted-foreground/30"
-                  :style="{ height: imageHeight + 'px', minHeight: '4rem' }"
+                  :style="imageBoxStyle"
                 >
                   —
                 </span>
@@ -265,7 +244,7 @@ function openBatchImagePreview(cell) {
         </div>
       </div>
       <p v-if="showSizeControls" class="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-        网格较宽时可横向滚动；缩略图尺寸会保存在本地浏览器。
+        与历史记录共用卡片宽度与图片适配；A×B 网格可横向滚动。
       </p>
     </CardContent>
     <ImageLightbox ref="lightboxRef" />

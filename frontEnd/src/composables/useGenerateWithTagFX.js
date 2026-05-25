@@ -10,15 +10,28 @@ import {
   useGenerateStageLog,
 } from '@/composables/useGenerateStageLog.js'
 import {
+  collectEnabledRandomGroups,
   fetchRandomGachaPlan,
   loadGlobalPromptConfigForPlan,
   waitForJobQueued,
   waitUntilJobRunning,
 } from '@/lib/randomGachaReels.js'
 import { scrollToGenerateStatus } from '@/lib/scrollToGenerateStatus.js'
+import { useVocabularyRandomMode } from '@/composables/useVocabularyRandomMode.js'
+import { useGachaAnimation } from '@/composables/useGachaAnimation.js'
+import { useSessionBundleGroups } from '@/composables/useSessionBundleGroups.js'
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} 超时（${Math.round(ms / 1000)}s）`)), ms)
+    }),
+  ])
 }
 
 /** 每步至少展示时长，便于在状态栏与按钮上阅读 */
@@ -34,6 +47,9 @@ export function useGenerateWithTagFX(opts = {}) {
   const app = useAppStore()
   const batch = useBatchStore()
   const { usesBatchApi } = useGenerateRunMode()
+  const { enabled: vocabRandomEnabled, rollForApp } = useVocabularyRandomMode()
+  const { effectiveEnabled: gachaAnimationEnabled } = useGachaAnimation()
+  const { masterEnabled: bundleGroupsEnabled } = useSessionBundleGroups()
   const animating = ref(false)
   const { stageMessage } = useGenerateStageLog()
 
@@ -60,6 +76,17 @@ export function useGenerateWithTagFX(opts = {}) {
     scrollToGenerateStatus({ sweep: multi })
 
     try {
+      if (vocabRandomEnabled.value) {
+        await showStage('抽取词库随机词…', 400)
+        const vocabResult = await rollForApp(app)
+        if (vocabResult.message) {
+          appendGenerateStageLog(vocabResult.message)
+          if (!vocabResult.applied && vocabResult.message.includes('失败')) {
+            app.setMessage(vocabResult.message, true)
+          }
+        }
+      }
+
       if (multi) {
         await showStage('加载当次提示词…')
         await runGenerate()
@@ -74,20 +101,53 @@ export function useGenerateWithTagFX(opts = {}) {
       )
 
       await showStage('加载当次提示词…')
-      appendGenerateStageLog('当次提示词与会话随机组已加载')
+      {
+        const n = collectEnabledRandomGroups(globalConfig, app.sessionPrompts).length
+        appendGenerateStageLog(
+          n ? `当次提示词已就绪（${n} 个随机组待抽取）` : '当次提示词已就绪（无随机组）',
+        )
+      }
 
-      appendGenerateStageLog('抽取随机提示词…')
-      stageMessage.value = '抽取随机提示词…'
-      const rows = await fetchRandomGachaPlan(app, { globalConfig })
-      const gachaOverlay = getRandomGachaOverlay()
-
-      if (rows?.length) {
-        appendGenerateStageLog(`共 ${rows.length} 个随机组，开始抽卡…`)
-        await gachaOverlay.playWithRows(rows, { targetEl: el })
-        appendGenerateStageLog('随机参数已确定')
+      const randomGroups = collectEnabledRandomGroups(globalConfig, app.sessionPrompts)
+      const hasRandomWork = randomGroups.length > 0 || bundleGroupsEnabled.value
+      if (!hasRandomWork) {
+        appendGenerateStageLog('无随机组/词串组，跳过抽卡')
+        await sleep(300)
+      } else if (!gachaAnimationEnabled.value) {
+        appendGenerateStageLog('抽卡动画已关闭，跳过动画')
+        await sleep(200)
       } else {
-        appendGenerateStageLog('无随机组，跳过抽卡')
-        await sleep(500)
+        appendGenerateStageLog('抽取随机提示词…')
+        stageMessage.value = '抽取随机提示词…'
+        let rows = null
+        try {
+          rows = await fetchRandomGachaPlan(app, {
+            globalConfig,
+            bundleMasterEnabled: bundleGroupsEnabled.value,
+          })
+        } catch (err) {
+          const msg = err?.message || String(err)
+          appendGenerateStageLog(`随机词预览失败：${msg}（将继续提交生成）`)
+          app.setMessage(`随机词预览失败，已跳过抽卡动画：${msg}`, true)
+        }
+
+        if (rows?.length) {
+          appendGenerateStageLog(`共 ${rows.length} 项随机抽取，开始抽卡…`)
+          try {
+            const gachaOverlay = getRandomGachaOverlay()
+            await withTimeout(
+              gachaOverlay.playWithRows(rows, { targetEl: el }),
+              12_000,
+              '抽卡动画',
+            )
+            appendGenerateStageLog('随机参数已确定')
+          } catch (err) {
+            const msg = err?.message || String(err)
+            appendGenerateStageLog(`抽卡动画跳过：${msg}（将继续提交生成）`)
+          }
+        } else if (hasRandomWork) {
+          appendGenerateStageLog('随机组已启用但未抽到词条，跳过抽卡动画')
+        }
       }
 
       await showStage('提交生成任务…')

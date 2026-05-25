@@ -1,4 +1,8 @@
-"""默认正/负提示词：与 CLIPTextEncode 合并（append 到工作流原文本后）。"""
+"""【已废弃】旧版全局默认 prefix/suffix（prompt_defaults.json）。
+
+新逻辑请用 global_prompt_config + prompt_build_service。
+仅保留 load_defaults() 供解析 CLIP 节点 id；勿再在入队时 apply_prompt_defaults。
+"""
 from __future__ import annotations
 
 import copy

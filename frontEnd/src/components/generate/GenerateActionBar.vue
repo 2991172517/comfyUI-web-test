@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Eye, BookmarkPlus } from 'lucide-vue-next'
+import { BookmarkPlus } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
 import { useGenerateRunMode } from '@/composables/useGenerateRunMode.js'
@@ -144,7 +144,6 @@ const busyLabel = computed(() => stageMessage.value || '准备中…')
         class="pointer-events-auto flex flex-wrap items-center justify-center gap-2 sm:gap-3 rounded-2xl border border-primary/50 bg-card/95 px-3 py-2.5 sm:px-5 shadow-[0_-4px_24px_rgba(0,0,0,0.45)] backdrop-blur-md"
       >
         <Button
-          v-if="!app.isMasterWorkflow"
           variant="outline"
           size="sm"
           class="shrink-0 border-border/80"
@@ -152,18 +151,6 @@ const busyLabel = computed(() => stageMessage.value || '准备中…')
           @click="app.saveWorkflow"
         >
           保存工作流
-        </Button>
-
-        <Button
-          v-if="usesBatchApi"
-          variant="outline"
-          size="sm"
-          class="shrink-0"
-          :disabled="runDisabled || !plannedTotal"
-          @click="batch.previewPlan"
-        >
-          <Eye class="h-4 w-4" />
-          预览 {{ plannedTotal || 0 }} 张
         </Button>
 
         <span
@@ -183,9 +170,7 @@ const busyLabel = computed(() => stageMessage.value || '准备中…')
           :title="
             buttonMode === 'idle' && !hasSingleQuotaLeft() && !allowsBatch()
               ? '本次登录单图额度已用尽'
-              : app.isMasterWorkflow
-                ? '母版试跑；另存参数请在工作流配置页复制子工作流'
-                : undefined
+              : undefined
           "
           class="min-w-[8rem]"
           @generate="onGenerate"

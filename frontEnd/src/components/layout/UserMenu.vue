@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
-import { ChevronDown, LogOut, Settings2, User } from 'lucide-vue-next'
+import { ChevronDown, LogOut, Settings2, Tags, User } from 'lucide-vue-next'
+import { buildSettingsNavItems } from '@/lib/appNavItems.js'
 import { api } from '@/api/client.js'
 import {
   authInviteCode,
@@ -24,6 +25,8 @@ const loggingOut = ref(false)
 onClickOutside(rootRef, () => {
   open.value = false
 })
+
+const settingsLinks = computed(() => buildSettingsNavItems())
 
 const displayLabel = computed(() => {
   void authRole.value
@@ -52,6 +55,11 @@ function toggle() {
 function openMagnifierSettings() {
   open.value = false
   router.push('/settings/magnifier')
+}
+
+function openSettingsRoute(to) {
+  open.value = false
+  router.push(to)
 }
 
 async function logout() {
@@ -110,6 +118,17 @@ async function logout() {
         >
           <Settings2 class="h-4 w-4 shrink-0 text-muted-foreground" />
           全局配置
+        </button>
+        <button
+          v-for="item in settingsLinks"
+          :key="item.to"
+          type="button"
+          role="menuitem"
+          class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-accent transition-colors"
+          @click="openSettingsRoute(item.to)"
+        >
+          <component :is="item.icon" class="h-4 w-4 shrink-0 text-muted-foreground" />
+          {{ item.label }}
         </button>
         <button
           type="button"

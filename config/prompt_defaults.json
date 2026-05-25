@@ -4,13 +4,13 @@
   "positive": {
     "node_id": "3",
     "field": "text",
-    "prefix": "masterpiece, best quality, amazing quality, absurdres,\n\n1girl, solo,\n(mature big sister:1.25), (gentle onee-san:1.2),\nelegant mature woman, soft mature beauty,\n\ngolden blonde hair, long golden blonde hair,\nside-swept hair covering one eye,\ngreen eyes, droopy eyes,\n\nvoluptuous mature figure,\nlarge breasts,\nslim narrow waist,\ngently wide hips,\nlong slender legs,\n\noff-shoulder nun outfit,\nblack off-shoulder nun dress,\nlong black nun skirt with side slit,\n\ngolden crucifix necklace,\n\nplain background, simple background",
+    "prefix": "",
     "suffix": ""
   },
   "negative": {
     "node_id": "4",
     "field": "text",
-    "prefix": "lowres, worst quality, bad quality, blurry,\n\ndeformed, bad anatomy, extra limbs, extra fingers, bad hands,\n\ncropped, close-up, upper body, half body,\nmultiple views, split screen,\n\nchild proportions, chibi proportions,\nshort legs, short lower body, stubby legs,\nthick short legs, bandy legs,\ndisproportionate body, oversized head,\n\nmassive breasts, huge breasts, exaggerated breasts,\ndeep cleavage,\n\nhigh slit, exposed hips,\n\ncomplex background, cluttered background,\n\nblack stockings,\nglossy skin, oily skin,\n\nprayer hands,\nhands together in front of chest",
+    "prefix": "",
     "suffix": ""
   },
   "merge_mode": "append"

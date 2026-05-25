@@ -5,13 +5,13 @@ import logging
 import shutil
 from pathlib import Path
 
-from config import COMFYUI_ROOT, MODEL_PREVIEW_EXTENSIONS
+from config import MODEL_PREVIEW_EXTENSIONS
+import model_paths_service
 from model_parser.source_url_utils import split_source_url_from_text
 
 log = logging.getLogger("custom_project.model_preview")
 
-VALID_FOLDERS = frozenset({"checkpoints", "loras"})
-MODELS_ROOT = COMFYUI_ROOT / "models"
+VALID_FOLDERS = model_paths_service.VALID_FOLDERS
 TXT_MAX_CHARS = 12_000
 MAX_UPLOAD_PREVIEW_BYTES = 15 * 1024 * 1024
 MAX_UPLOAD_FILES_PER_REQUEST = 10
@@ -26,9 +26,7 @@ _MIME_TO_EXT = {
 
 
 def models_folder_dir(folder: str) -> Path:
-    if folder not in VALID_FOLDERS:
-        raise ValueError(f"不支持的模型目录: {folder}")
-    return MODELS_ROOT / folder
+    return model_paths_service.resolve_folder_path(folder)
 
 
 def _model_key(model_name: str) -> str:

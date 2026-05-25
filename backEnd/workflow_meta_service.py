@@ -1,4 +1,4 @@
-"""工作流元数据：母版拓扑、子工作流、Style 开关（LoRA 链 / 未来 conditioning）。"""
+"""工作流元数据：拓扑、分类、Style 开关（LoRA 链 / 未来 conditioning）。"""
 from __future__ import annotations
 
 import copy
@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from config import (
+    WORKFLOW_SEED_ID,
     WORKFLOW_TEMPLATE_ID,
     WORKFLOW_VARIANTS_DIR,
     WORKFLOWS_DIR,
 )
+from workflow_categories import category_for_meta, normalize_category
 
 META_SUFFIX = ".meta.json"
 VARIANT_PREFIX = "variants/"
@@ -140,6 +142,16 @@ def _infer_meta_from_template(workflow_id: str) -> dict:
     }
 
 
+def get_enabled_preview_node_ids(meta: dict) -> list[str]:
+    """已勾选的 PreviewImage 节点 ID；默认空列表（不跑任何预览）。"""
+    raw = meta.get("enabled_preview_node_ids")
+    if raw is None:
+        raw = (meta.get("topology") or {}).get("enabled_preview_node_ids")
+    if not raw:
+        return []
+    return [str(x) for x in raw if str(x).strip()]
+
+
 def get_effective_meta(workflow_id: str, runtime: dict | None = None) -> dict:
     meta = load_meta(workflow_id) or _infer_meta_from_template(
         WORKFLOW_TEMPLATE_ID if workflow_id.startswith(VARIANT_PREFIX) else workflow_id
@@ -159,11 +171,12 @@ def list_variants() -> list[dict]:
         vid = variant_id_from_meta_filename(path.name)
         with open(path, encoding="utf-8") as f:
             meta = json.load(f)
+        wid = f"{VARIANT_PREFIX}{vid}"
         items.append({
-            "id": f"{VARIANT_PREFIX}{vid}",
+            "id": wid,
             "variant_id": vid,
             "display_name": meta.get("display_name", vid),
-            "template_id": meta.get("template_id", WORKFLOW_TEMPLATE_ID),
+            "category": category_for_meta(wid, meta),
             "style_enabled": meta.get("style_enabled", meta.get("style_enabled_default", False)),
             "path": str(path),
         })
@@ -174,7 +187,8 @@ def create_variant(
     variant_id: str | None = None,
     display_name: str | None = None,
     *,
-    copy_template: bool = True,
+    category: str | None = None,
+    copy_from: str | None = None,
 ) -> dict:
     if variant_id:
         safe = sanitize_variant_id(variant_id)
@@ -186,31 +200,59 @@ def create_variant(
         safe = allocate_variant_id(display_name)
     json_path = _variant_json_path(safe)
     meta_path = WORKFLOW_VARIANTS_DIR / f"{safe}{META_SUFFIX}"
+    workflow_id = f"{VARIANT_PREFIX}{safe}"
+    cat = normalize_category(category)
 
-    template_meta = load_meta(WORKFLOW_TEMPLATE_ID) or _infer_meta_from_template(WORKFLOW_TEMPLATE_ID)
-    if copy_template:
-        from workflow_service import load_workflow_file, save_workflow_file
+    from workflow_service import load_workflow_file, save_workflow_file
 
-        fmt, data = load_workflow_file(WORKFLOW_TEMPLATE_ID)
-        save_workflow_file(f"{VARIANT_PREFIX}{safe}", data)
+    if copy_from:
+        src_id = normalize_variant_workflow_id(copy_from.strip())
+        if not src_id.startswith(VARIANT_PREFIX):
+            raise ValueError("只能复制 variants/ 下的工作流")
+        _, data = load_workflow_file(src_id)
+        src_meta = load_meta(src_id) or {}
+        topology = copy.deepcopy(src_meta.get("topology") or {})
+        style_default = src_meta.get("style_enabled_default", False)
+        cat = normalize_category(category or src_meta.get("category"))
+    else:
+        seed_id = WORKFLOW_SEED_ID
+        try:
+            _, data = load_workflow_file(seed_id)
+        except FileNotFoundError:
+            _, data = load_workflow_file(WORKFLOW_TEMPLATE_ID)
+            seed_meta = load_meta(WORKFLOW_TEMPLATE_ID) or _infer_meta_from_template(WORKFLOW_TEMPLATE_ID)
+            topology = copy.deepcopy(seed_meta.get("topology", {}))
+            style_default = seed_meta.get("style_enabled_default", False)
+        else:
+            from workflow_import_service import infer_topology_from_prompt
+
+            topology = infer_topology_from_prompt(data)
+            seed_meta = load_meta(seed_id) or {}
+            style_default = seed_meta.get("style_enabled_default", False)
+        save_workflow_file(workflow_id, data)
+
+    if copy_from:
+        save_workflow_file(workflow_id, data)
 
     meta = {
         "schema_version": 1,
-        "template_id": WORKFLOW_TEMPLATE_ID,
-        "is_master": False,
         "variant_id": safe,
+        "category": cat,
         "display_name": display_name or safe,
-        "style_enabled": template_meta.get("style_enabled_default", False),
-        "style_enabled_default": template_meta.get("style_enabled_default", False),
-        "topology": copy.deepcopy(template_meta.get("topology", {})),
+        "style_enabled": style_default if copy_from else False,
+        "style_enabled_default": style_default,
+        "topology": topology,
     }
+    if copy_from:
+        meta["copied_from"] = src_id
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
     return {
-        "id": f"{VARIANT_PREFIX}{safe}",
+        "id": workflow_id,
         "variant_id": safe,
         "display_name": meta["display_name"],
+        "category": cat,
         "workflow_path": str(json_path),
         "meta_path": str(meta_path),
     }
@@ -284,9 +326,9 @@ def enrich_workflow_detail(workflow_id: str, detail: dict, meta: dict | None = N
     detail = copy.deepcopy(detail)
     detail["meta"] = m
     detail["style_enabled"] = m.get("style_enabled", False)
-    detail["is_master"] = m.get("is_master", workflow_id == WORKFLOW_TEMPLATE_ID)
+    detail["is_master"] = False
     detail["display_name"] = m.get("display_name", workflow_id)
-    detail["template_id"] = m.get("template_id", WORKFLOW_TEMPLATE_ID)
+    detail["category"] = category_for_meta(workflow_id, m)
 
     topo = m.get("topology", {})
     slot_by_id = {str(s["node_id"]): s for s in topo.get("lora_slots", [])}
@@ -299,6 +341,12 @@ def enrich_workflow_detail(workflow_id: str, detail: dict, meta: dict | None = N
     detail["prompt_encode"] = resolve_prompt_encode(
         m, detail.get("prompt") or {}, detail.get("nodes") or []
     )
+    from workflow_service import discover_pipeline_nodes, discover_preview_nodes
+
+    prompt = detail.get("prompt") or {}
+    detail["pipeline_nodes"] = discover_pipeline_nodes(prompt)
+    detail["preview_nodes"] = discover_preview_nodes(prompt)
+    detail["enabled_preview_node_ids"] = get_enabled_preview_node_ids(m)
     return detail
 
 

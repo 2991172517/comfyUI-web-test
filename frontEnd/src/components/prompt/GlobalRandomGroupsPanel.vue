@@ -14,11 +14,13 @@ import {
   globalConfigToPromptLayers,
   formatGlobalRandomSummary,
   globalRandomGroupsActive,
+  serializeGlobalPromptConfig,
 } from '@/composables/usePromptConfig.js'
 import { notifyGlobalPromptSaved } from '@/composables/useGlobalPromptQuick.js'
 
 const app = useAppStore()
 const randomGroups = ref([])
+const cachedGachaEnabled = ref(true)
 const loading = ref(false)
 const masterSaving = ref(false)
 const simulating = ref(false)
@@ -40,6 +42,7 @@ async function load() {
     const res = await api.getGlobalPromptConfig()
     cachedBase = globalConfigToPromptLayers(res.config)
     randomGroups.value = cachedBase.random_groups || []
+    cachedGachaEnabled.value = res.config?.gacha_animation_enabled !== false
     randomGroupSnapshot = null
   } finally {
     loading.value = false
@@ -50,13 +53,12 @@ async function load() {
 
 async function persist() {
   if (!cachedBase) return
-  await api.saveGlobalPromptConfig({
-    enabled: cachedBase.enabled,
-    positive: cachedBase.positive,
-    negative: cachedBase.negative,
-    merge: cachedBase.merge,
-    random_groups: randomGroups.value,
-  })
+  await api.saveGlobalPromptConfig(
+    serializeGlobalPromptConfig(
+      { ...cachedBase, random_groups: randomGroups.value },
+      { gacha_animation_enabled: cachedGachaEnabled.value },
+    ),
+  )
   notifyGlobalPromptSaved()
 }
 

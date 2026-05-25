@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 import vocabulary as vocabulary_service
@@ -56,6 +56,97 @@ def vocabulary_resolve(body: ResolveBody):
     except Exception as e:
         log.exception("vocabulary resolve failed")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/merge-manifest")
+async def vocabulary_merge_manifest(
+    file: UploadFile = File(..., description="manifest v2 JSON 文件"),
+    dry_run: bool = Query(False, description="仅预览合并统计，不写盘"),
+):
+    """并入主 manifest 并自动重建索引（无需重启后端）。"""
+    try:
+        raw = await file.read()
+        if len(raw) > 80 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="文件过大（上限 80MB）")
+        return vocabulary_service.merge_manifest_upload(raw, dry_run=dry_run)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        log.exception("vocabulary merge-manifest failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class MergeManifestBody(BaseModel):
+    version: int = 2
+    rootCategoryId: str | None = None
+    rootCategoryName: str | None = None
+    categories: list[dict] = Field(default_factory=list)
+    prompts: list[dict] = Field(default_factory=list)
+
+
+@router.post("/merge-manifest/json")
+def vocabulary_merge_manifest_json(
+    body: MergeManifestBody,
+    dry_run: bool = Query(False),
+):
+    """JSON body 方式并入（与文件上传等价）。"""
+    try:
+        return vocabulary_service.merge_manifest_json(
+            body.model_dump(),
+            dry_run=dry_run,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        log.exception("vocabulary merge-manifest json failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/merge-manifest/schema")
+def vocabulary_merge_schema():
+    """返回 manifest v2 字段说明（供前端展示）。"""
+    return {
+        "ok": True,
+        "version": 2,
+        "description": "Prompt Gallery / WeiLin 导出格式",
+        "requiredTopLevel": ["categories", "prompts"],
+        "optionalTopLevel": ["version", "rootCategoryId", "rootCategoryName", "exportedAt"],
+        "categoryFields": {
+            "id": "分类唯一 ID（字符串）",
+            "name": "显示名称",
+            "parentId": "父分类 id，顶层父为 root 或根节点 id",
+            "order": "排序整数",
+        },
+        "promptFields": {
+            "id": "可选，词条 ID",
+            "name": "显示名 / 中文说明",
+            "value": "写入提示词的英文 tag 文本（去重键之一）",
+            "categoryId": "所属分类 id（去重键之一）",
+        },
+        "dedupRules": [
+            "分类：相同 id 已存在则跳过",
+            "词条：相同 categoryId + value（忽略大小写）只保留一条",
+        ],
+        "example": {
+            "version": 2,
+            "rootCategoryId": "my-root-id",
+            "rootCategoryName": "导入词库",
+            "categories": [
+                {"id": "my-root-id", "name": "导入词库", "parentId": "root", "order": 0},
+                {"id": "cat-1", "name": "人物", "parentId": "my-root-id", "order": 1},
+            ],
+            "prompts": [
+                {
+                    "id": "p-1",
+                    "name": "1girl",
+                    "value": "1girl",
+                    "categoryId": "cat-1",
+                }
+            ],
+        },
+    }
 
 
 @router.post("/rebuild")

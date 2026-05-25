@@ -89,12 +89,26 @@ export function createHistoryStore() {
     singleDetail.value = null
   }
 
+  function removeRecordFromList(id, type) {
+    records.value = records.value.filter((r) => {
+      if (type === 'batch') return r.type !== 'batch' || (r.batch_id || r.id) !== id
+      return r.type === 'batch' || (r.prompt_id !== id && r.id !== id)
+    })
+  }
+
+  function patchBatchRecordInList(batchId, patch) {
+    records.value = records.value.map((r) => {
+      if (r.type !== 'batch' || (r.batch_id || r.id) !== batchId) return r
+      return { ...r, ...patch }
+    })
+  }
+
   async function deleteSingle(promptId) {
     await api.deleteHistorySingle(promptId)
     if (selected.value?.prompt_id === promptId || selected.value?.id === promptId) {
       clearDetailSelection()
     }
-    await refresh()
+    removeRecordFromList(promptId, 'single')
   }
 
   async function deleteBatch(batchId) {
@@ -102,16 +116,68 @@ export function createHistoryStore() {
     if (selected.value?.batch_id === batchId || selected.value?.id === batchId) {
       clearDetailSelection()
     }
-    await refresh()
+    removeRecordFromList(batchId, 'batch')
   }
 
   async function deleteBatchItems(batchId, indices) {
     const res = await api.deleteHistoryBatchItems(batchId, indices)
-    if (selected.value?.batch_id === batchId || selected.value?.id === batchId) {
-      const rec = selected.value
-      await selectRecord(rec)
+    const idxSet = new Set(indices.map((i) => Number(i)))
+    const batchFullyGone =
+      res.remaining === 0 ||
+      (res.removed == null && res.remaining == null)
+
+    if (batchFullyGone) {
+      if (selected.value?.batch_id === batchId || selected.value?.id === batchId) {
+        clearDetailSelection()
+      }
+      removeRecordFromList(batchId, 'batch')
+      return res
     }
-    await refresh()
+
+    if (
+      batchDetail.value &&
+      (batchDetail.value.batch_id === batchId || batchDetail.value.id === batchId)
+    ) {
+      const items = (batchDetail.value.items || []).filter(
+        (it) => !idxSet.has(Number(it.index)),
+      )
+      const plan = batchDetail.value.plan || {}
+      const grid = {
+        ...(plan.grid || batchDetail.value.grid || {}),
+        total: items.length,
+      }
+      const completed = items.filter(
+        (it) => it.status === 'completed' && (it.images?.length),
+      ).length
+      batchDetail.value = {
+        ...batchDetail.value,
+        items,
+        completed,
+        total: items.length,
+        plan: { ...plan, grid },
+        grid,
+      }
+      if (selected.value?.type === 'batch') {
+        selected.value = {
+          ...selected.value,
+          completed,
+          total: items.length,
+        }
+      }
+    }
+
+    const removed = res.removed ?? indices.length
+    const total = res.remaining
+    const listRec = records.value.find(
+      (r) => r.type === 'batch' && (r.batch_id || r.id) === batchId,
+    )
+    if (listRec) {
+      patchBatchRecordInList(batchId, {
+        total,
+        completed: Math.max(0, (listRec.completed ?? 0) - removed),
+      })
+    }
+
     return res
   }
 

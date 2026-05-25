@@ -7,6 +7,7 @@ import CardTitle from '@/components/ui/CardTitle.vue'
 import CardDescription from '@/components/ui/CardDescription.vue'
 import CardContent from '@/components/ui/CardContent.vue'
 import Badge from '@/components/ui/Badge.vue'
+import { categoryLabel, normalizeCategory } from '@/lib/workflowCategories.js'
 import { cn } from '@/lib/utils'
 
 const props = defineProps({
@@ -64,9 +65,9 @@ async function selectWorkflow(id) {
           @click="selectWorkflow(wf.id)"
         >
           {{ wf.display_name || wf.name }}
-          <Badge v-if="wf.is_master" variant="secondary" class="ml-1 text-[10px]">母版</Badge>
-          <Badge v-else-if="wf.is_variant" variant="outline" class="ml-1 text-[10px]">子</Badge>
-          <Badge variant="outline" class="ml-1.5 text-[10px]">{{ wf.format }}</Badge>
+          <Badge variant="outline" class="ml-1 text-[10px]">
+            {{ categoryLabel(normalizeCategory(wf.category)) }}
+          </Badge>
         </button>
       </div>
       <p v-if="!store.workflows.length" class="text-sm text-muted-foreground">

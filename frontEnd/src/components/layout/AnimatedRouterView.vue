@@ -1,13 +1,17 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 
 const route = useRoute()
+
+/** 同一路由仅 query 变化时不销毁页面（如局部重绘 bootstrap、生成页 restore） */
+const routeMotionKey = computed(() => route.name || route.path)
 </script>
 
 <template>
   <RouterView v-slot="{ Component }">
     <Transition name="route-view">
-      <div :key="route.fullPath" class="route-motion-shell">
+      <div :key="routeMotionKey" class="route-motion-shell">
         <component :is="Component" />
       </div>
     </Transition>

@@ -4,25 +4,13 @@ import { X } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import PromptSettingsPanel from '@/components/prompt/PromptSettingsPanel.vue'
 import { useGlobalPromptModal } from '@/composables/useGlobalPromptModal.js'
-import { useModalMotion } from '@/composables/useModalMotion.js'
 
 const { open, activeTab, close } = useGlobalPromptModal()
 const settingsPanelRef = ref(null)
-const backdropRef = ref(null)
-const dialogRef = ref(null)
-const closing = ref(false)
 
-useModalMotion(open, backdropRef, dialogRef)
-
-async function requestClose() {
-  if (closing.value) return
-  closing.value = true
-  try {
-    await settingsPanelRef.value?.flushPendingSaves?.()
-  } finally {
-    closing.value = false
-    close()
-  }
+function requestClose() {
+  close()
+  void settingsPanelRef.value?.flushPendingSaves?.()
 }
 
 function onBackdrop(e) {
@@ -34,13 +22,11 @@ function onBackdrop(e) {
   <Teleport to="body">
     <div
       v-if="open"
-      ref="backdropRef"
-      class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm"
+      class="fixed inset-0 z-[90] flex items-end justify-center sm:items-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150"
       @click="onBackdrop"
     >
       <div
-        ref="dialogRef"
-        class="flex max-h-[min(92vh,800px)] w-full max-w-4xl flex-col overflow-hidden rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl"
+        class="flex max-h-[min(92vh,800px)] w-full max-w-4xl flex-col overflow-hidden rounded-t-xl sm:rounded-xl border border-border bg-card shadow-xl animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="global-prompt-settings-title"
@@ -54,7 +40,7 @@ function onBackdrop(e) {
               提示词设置
             </h2>
             <p class="text-[11px] text-muted-foreground mt-0.5">
-              全局提示词、随机池与预设库；停止编辑约 0.7 秒后自动保存，关闭前会提交未保存改动
+              仅保存当前标签页；停止编辑约 0.7 秒后自动保存。关闭后未保存内容会在后台提交。
             </p>
           </div>
           <Button
@@ -62,7 +48,6 @@ function onBackdrop(e) {
             size="sm"
             class="h-8 w-8 p-0 shrink-0"
             aria-label="关闭"
-            :disabled="closing"
             @click="requestClose"
           >
             <X class="h-4 w-4" />

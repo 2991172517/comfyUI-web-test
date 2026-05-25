@@ -25,6 +25,24 @@ const routes = [
         },
       },
       {
+        path: 'inpaint',
+        name: 'inpaint',
+        component: () => import('@/views/InpaintView.vue'),
+        meta: {
+          title: '局部重绘',
+          description: '上传图片、涂抹蒙版、按区域重绘',
+        },
+      },
+      {
+        path: 'upscale',
+        name: 'upscale',
+        component: () => import('@/views/UpscaleView.vue'),
+        meta: {
+          title: '高清放大',
+          description: 'RTX 超分辨率放大已有图片',
+        },
+      },
+      {
         path: 'batch',
         redirect: (to) => ({
           path: '/generate',

@@ -238,6 +238,15 @@ def assert_workflow_config_allowed(token: str | None) -> None:
         raise PermissionError("邀请码用户无法查看或修改工作流配置")
 
 
+def assert_lora_chain_edit_allowed(token: str | None) -> None:
+    """生成页 / 运行时可调整 LoRA 链（邀请码用户可用，母版只读由业务层拦截）。"""
+    if is_admin(token):
+        return
+    if get_session(token):
+        return
+    raise PermissionError("未登录或会话已失效")
+
+
 def session_info(token: str | None) -> dict:
     sess = get_session(token)
     if not sess:

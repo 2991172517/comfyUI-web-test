@@ -11,6 +11,7 @@ from typing import Any, Callable
 from config import PROJECT_ROOT
 from model_node_catalog_service import load_store
 from model_parser.site_router import SiteRouter
+import model_paths_service
 from model_preview_service import VALID_FOLDERS, models_folder_dir, read_summary_txt_for_model
 from services import import_job_store, model_import_service
 
@@ -33,17 +34,8 @@ def _is_model_file(path: Path) -> bool:
 
 
 def list_local_model_names(folder: str) -> list[str]:
-    """扫描 models/{folder} 下权重文件（含子目录，相对路径）。"""
-    if folder not in VALID_FOLDERS:
-        raise ValueError(f"不支持的目录: {folder}")
-    root = models_folder_dir(folder)
-    if not root.is_dir():
-        return []
-    names: list[str] = []
-    for path in root.rglob("*"):
-        if _is_model_file(path):
-            names.append(str(path.relative_to(root)).replace("\\", "/"))
-    return sorted(set(names))
+    """扫描配置目录下权重文件（含子目录，相对路径）。"""
+    return model_paths_service.list_model_filenames(folder)
 
 
 def model_file_path(folder: str, name: str) -> Path:

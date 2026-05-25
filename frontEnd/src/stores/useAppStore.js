@@ -9,11 +9,28 @@ import {
   serializePromptConfig,
   promptConfigHasContent,
 } from '@/composables/usePromptConfig.js'
+import { isPngRestoreWorkflowId } from '@/lib/workflowCategories.js'
 import {
   resolveRestoreWorkflowId,
   WORKFLOW_TEMPLATE_ID,
 } from '@/lib/workflowRestore.js'
+import {
+  discoverPipelineNodesFromPrompt,
+  discoverPreviewNodesFromPrompt,
+  filterPipelineForExecution,
+} from '@/lib/discoverPreviewNodes.js'
+import { mergeCompletedNodeIds } from '@/lib/mergeJobProgress.js'
+import { isGenerateWsConnected } from '@/lib/generateQueueWs.js'
+import { applyWsJobToAppJob } from '@/stores/useGenerateQueueStore.js'
 import { getConfirmDialog } from '@/composables/useConfirmDialog.js'
+import {
+  buildSessionLorasForUi,
+  createSessionLoraChain,
+  isSessionLoraId,
+  newSessionLoraId,
+  serializeSessionLoraChain,
+  sessionChainIsDirty,
+} from '@/lib/sessionLoraChain.js'
 
 const APP_STORE = Symbol('appStore')
 
@@ -43,8 +60,21 @@ export function createAppStore() {
   const sessionPromptPresetId = ref('')
   const sessionPromptPresetName = ref('')
   const promptEncode = ref(null)
+  /** 流水线全节点（总体预览，按 ID 排序） */
+  const pipelineNodes = ref([])
+  /** 仅 PreviewImage（兼容） */
+  const previewNodes = ref([])
+  /** 本次/默认启用的预览节点 ID；空 = 仅 SaveImage */
+  const enabledPreviewNodeIds = ref([])
   /** 每次从历史快照恢复后递增，用于强制刷新 LoRA 等表单控件 */
   const restoreEpoch = ref(0)
+  /** 「以此生成」等恢复的 PNG/缺失工作流，生成页显示为临时工作流 */
+  const temporaryWorkflowActive = ref(false)
+  const temporaryWorkflowHint = ref('')
+  /** 生成页临时 LoRA 链（不写回工作流文件） */
+  const sessionLoraChain = ref(null)
+  /** 最近一次单张入队的最终正/负全文（前端 merge-preview 结果，便于复制排错） */
+  const lastQueuedPrompts = ref(null)
 
   const job = reactive({
     promptId: '',
@@ -55,9 +85,19 @@ export function createAppStore() {
     progress: null,
     message: '',
     images: [],
+    /** 本次 queue 实际执行的节点（已去掉未勾选预览） */
+    trackPipelineNodes: [],
+    completedNodeIds: [],
   })
 
   let pollTimer = null
+  let pollActive = false
+  let pollBurstCount = 0
+  const POLL_BURST_MS = 200
+  const POLL_BURST_MAX = 12
+  const POLL_MS_ACTIVE = 400
+  const POLL_MS_PENDING = 700
+  const POLL_MS_FINALIZING = 450
   const { refreshFavorites } = useFavorites()
 
   function setMessage(text, isError = false) {
@@ -75,14 +115,35 @@ export function createAppStore() {
       progress: null,
       message: '',
       images: [],
+      trackPipelineNodes: [],
+      completedNodeIds: [],
     })
   }
 
   function stopPoll() {
+    pollActive = false
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
+  }
+
+  function pollIntervalMs() {
+    if (pollBurstCount < POLL_BURST_MAX) return POLL_BURST_MS
+    if (job.status === 'finalizing') return POLL_MS_FINALIZING
+    if (job.status === 'in_progress') return POLL_MS_ACTIVE
+    return POLL_MS_PENDING
+  }
+
+  function scheduleJobPoll(promptId) {
+    if (!pollActive) return
+    pollTimer = setTimeout(async () => {
+      if (!pollActive) return
+      await pollJobOnce(promptId)
+      if (!pollActive) return
+      pollBurstCount += 1
+      scheduleJobPoll(promptId)
+    }, pollIntervalMs())
   }
 
   function nid(nodeId) {
@@ -241,9 +302,7 @@ export function createAppStore() {
     )
     if (!selectedId.value && workflows.value.length) {
       const pick =
-        workflows.value.find((w) => w.is_master) ||
-        workflows.value.find((w) => w.id === 'First_api') ||
-        workflows.value[0]
+        workflows.value.find((w) => w.category === 'generate') || workflows.value[0]
       selectedId.value = pick.id
       await loadWorkflow(selectedId.value)
     }
@@ -286,7 +345,26 @@ export function createAppStore() {
       workflowMeta.value = res.meta || null
       promptEncode.value = res.prompt_encode || null
       styleEnabled.value = !!res.style_enabled
-      isMasterWorkflow.value = !!res.is_master
+      isMasterWorkflow.value = false
+      let pipeline = res.pipeline_nodes || []
+      if (!pipeline.length) {
+        pipeline = discoverPipelineNodesFromPrompt(res.prompt)
+      }
+      if (!pipeline.length) {
+        try {
+          const pn = await api.getWorkflowPreviewNodes(id)
+          pipeline = pn.pipeline_nodes || []
+          if (pn.enabled_preview_node_ids && !res.enabled_preview_node_ids) {
+            res.enabled_preview_node_ids = pn.enabled_preview_node_ids
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      pipelineNodes.value = pipeline
+      previewNodes.value = pipeline.filter((n) => n.is_preview)
+      enabledPreviewNodeIds.value = (res.enabled_preview_node_ids || []).map(String)
+      resetSessionLoraChain()
       Object.keys(overrides).forEach((k) => delete overrides[k])
       for (const node of res.nodes) {
         for (const field of node.fields) {
@@ -335,7 +413,8 @@ export function createAppStore() {
     const nodes = workflowTargets.value?.seed_nodes || []
     if (nodes.length) {
       for (const sn of nodes) {
-        ensureOverride(String(sn.node_id), 'seed', snap.seed)
+        const field = sn.seed_field || 'seed'
+        ensureOverride(String(sn.node_id), field, snap.seed)
       }
       return
     }
@@ -343,7 +422,27 @@ export function createAppStore() {
     if (fallback) ensureOverride(String(fallback), 'seed', snap.seed)
   }
 
+  function clearTemporaryWorkflow() {
+    temporaryWorkflowActive.value = false
+    temporaryWorkflowHint.value = ''
+  }
+
+  function markTemporaryWorkflow(snap, { id, usedFallback, missingId }) {
+    const temp = !!(
+      snap?.temporary_workflow ||
+      snap?.imported_variant ||
+      isPngRestoreWorkflowId(id) ||
+      (usedFallback && missingId)
+    )
+    temporaryWorkflowActive.value = temp
+    temporaryWorkflowHint.value =
+      temp && missingId && missingId !== id ? String(missingId) : ''
+  }
+
   async function applyWorkflowSnapshot(snap) {
+    if (snap?.imported_variant || snap?.restore_source === 'png_metadata') {
+      await loadWorkflowList()
+    }
     const { id, usedFallback, missingId, requested } = await resolveWorkflowForRestore(snap)
     if (!id) {
       setMessage('没有可用的工作流文件，请先将 API 工作流放入 workflows/', true)
@@ -366,7 +465,10 @@ export function createAppStore() {
     } else {
       clearSessionPrompts()
     }
-    if (usedFallback && missingId) {
+    markTemporaryWorkflow(snap, { id, usedFallback, missingId })
+    if (snap.restore_message) {
+      setMessage(snap.restore_message)
+    } else if (usedFallback && missingId) {
       setMessage(
         `原工作流「${missingId}」不在列表中，已用「${id === WORKFLOW_TEMPLATE_ID ? '母版' : id}」拓扑恢复参数`,
       )
@@ -388,12 +490,44 @@ export function createAppStore() {
     }
   }
 
+  function setEnabledPreviewNodeIds(ids) {
+    const sorted = [...ids].map(String).sort((a, b) => {
+      const na = Number(a)
+      const nb = Number(b)
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb
+      return a.localeCompare(b)
+    })
+    enabledPreviewNodeIds.value = sorted
+  }
+
+  function previewNodeLabel(nodeId) {
+    const id = String(nodeId)
+    const saveId = workflowTargets.value?.save_node_id
+    if (saveId && id === String(saveId)) return '保存图像'
+    const hit = previewNodes.value.find((n) => String(n.node_id) === id)
+    return hit?.title || `节点 #${id}`
+  }
+
+  async function savePreviewNodeSelection({ quiet = false } = {}) {
+    if (!selectedId.value) return
+    try {
+      await api.updateWorkflowMeta(selectedId.value, {
+        enabled_preview_node_ids: [...enabledPreviewNodeIds.value],
+      })
+      if (workflowMeta.value) {
+        workflowMeta.value = {
+          ...workflowMeta.value,
+          enabled_preview_node_ids: [...enabledPreviewNodeIds.value],
+        }
+      }
+      if (!quiet) setMessage('预览节点默认已保存')
+    } catch (e) {
+      setMessage(e.message, true)
+    }
+  }
+
   async function saveWorkflow() {
     if (!selectedId.value) return
-    if (isMasterWorkflow.value) {
-      setMessage('母版工作流只读，请在工作流页另存为子工作流后再保存', true)
-      return
-    }
     loading.value = true
     try {
       await api.saveWorkflow(selectedId.value, { ...overrides })
@@ -405,6 +539,161 @@ export function createAppStore() {
     }
   }
 
+  async function refreshWorkflowAfterChainEdit(workflowId) {
+    const wid = workflowId || selectedId.value
+    if (!wid) return
+    await loadWorkflow(wid)
+    if (wid === selectedId.value) {
+      syncWorkflowLorasFromOverrides()
+      restoreEpoch.value += 1
+    }
+  }
+
+  async function addLoraChainSlot(loraName, workflowId = null) {
+    const wid = workflowId || selectedId.value
+    if (!wid || !loraName) return
+    try {
+      await api.addLoraSlot(wid, { role: 'character', lora_name: loraName })
+      await refreshWorkflowAfterChainEdit(wid)
+      if (wid === selectedId.value) setMessage('已添加 LoRA')
+    } catch (e) {
+      setMessage(e.message, true)
+      throw e
+    }
+  }
+
+  async function removeLoraChainSlot(nodeId, workflowId = null) {
+    const wid = workflowId || selectedId.value
+    if (!wid) return
+    try {
+      await api.removeLoraSlot(wid, nodeId)
+      await refreshWorkflowAfterChainEdit(wid)
+      if (wid === selectedId.value) setMessage('已移除 LoRA')
+    } catch (e) {
+      setMessage(e.message, true)
+      throw e
+    }
+  }
+
+  async function reorderLoraChain(nodeIds, workflowId = null) {
+    const wid = workflowId || selectedId.value
+    if (!wid || !nodeIds?.length) return
+    try {
+      await api.reorderLoraSlots(wid, nodeIds)
+      await refreshWorkflowAfterChainEdit(wid)
+    } catch (e) {
+      setMessage(e.message, true)
+      throw e
+    }
+  }
+
+  function resetSessionLoraChain() {
+    sessionLoraChain.value = null
+  }
+
+  function initSessionLoraChain() {
+    if (sessionLoraChain.value) return sessionLoraChain.value
+    sessionLoraChain.value = createSessionLoraChain(workflowLoras.value)
+    return sessionLoraChain.value
+  }
+
+  function sessionLoraPayloadForQueue() {
+    if (!sessionLoraChain.value) return null
+    const base = workflowLoras.value.map((l) => String(l.node_id))
+    if (!sessionChainIsDirty(sessionLoraChain.value, base)) return null
+    return serializeSessionLoraChain(sessionLoraChain.value)
+  }
+
+  async function sessionAddLora(loraName) {
+    if (!loraName) return
+    initSessionLoraChain()
+    const id = newSessionLoraId()
+    let sm = 0.65
+    let sc = 0.65
+    try {
+      const res = await api.getLoraModelDefaults(loraName)
+      const d = res?.defaults
+      if (d?.strength_model != null) sm = Number(d.strength_model)
+      if (d?.strength_clip != null) sc = Number(d.strength_clip)
+    } catch {
+      /* defaults */
+    }
+    sessionLoraChain.value.added.push({
+      id,
+      lora_name: loraName,
+      strength_model: sm,
+      strength_clip: sc,
+      role: 'character',
+    })
+    sessionLoraChain.value.order.push(id)
+    ensureOverride(id, 'lora_name', loraName)
+    ensureOverride(id, 'strength_model', sm)
+    ensureOverride(id, 'strength_clip', sc)
+    setMessage('已添加 LoRA（仅本次生成生效）')
+  }
+
+  function sessionRemoveLora(nodeId) {
+    initSessionLoraChain()
+    const id = String(nodeId)
+    if (isSessionLoraId(id)) {
+      sessionLoraChain.value.added = sessionLoraChain.value.added.filter((a) => a.id !== id)
+      sessionLoraChain.value.order = sessionLoraChain.value.order.filter((x) => x !== id)
+      delete overrides[id]
+    } else {
+      if (!sessionLoraChain.value.hidden.includes(id)) {
+        sessionLoraChain.value.hidden.push(id)
+      }
+      sessionLoraChain.value.order = sessionLoraChain.value.order.filter((x) => x !== id)
+    }
+    setMessage('已移除 LoRA（仅本次生成生效）')
+  }
+
+  function sessionMoveLora(nodeId, delta) {
+    initSessionLoraChain()
+    const order = [...sessionLoraChain.value.order]
+    const idx = order.indexOf(String(nodeId))
+    if (idx < 0) return
+    const to = idx + delta
+    if (to < 0 || to >= order.length) return
+    const [item] = order.splice(idx, 1)
+    order.splice(to, 0, item)
+    sessionLoraChain.value.order = order
+  }
+
+  function sessionReorderLoras(nodeIds) {
+    initSessionLoraChain()
+    const hidden = sessionLoraChain.value.hidden || []
+    const tail = sessionLoraChain.value.order.filter(
+      (id) => hidden.includes(id) && !nodeIds.includes(id),
+    )
+    sessionLoraChain.value.order = [...nodeIds, ...tail]
+  }
+
+  function applyWsJobEvent(ev) {
+    if (!job.promptId || ev.prompt_id !== job.promptId) return
+    applyWsJobToAppJob(job, job.trackPipelineNodes, ev)
+    job.statusText = statusLabel(job.status)
+    if (ev.status === 'completed' && !(job.images || []).length) {
+      api.getJob(ev.prompt_id).then(applyJobDetail).catch(() => {})
+    }
+    if (['completed', 'failed', 'cancelled'].includes(job.status)) {
+      stopPoll()
+      if (job.status === 'completed') {
+        const previewIds = new Set(
+          (job.trackPipelineNodes || [])
+            .filter((n) => n.is_preview)
+            .map((n) => String(n.node_id)),
+        )
+        const finalCount = (job.images || []).filter(
+          (img) => !previewIds.has(String(img.node_id)),
+        ).length
+        if (finalCount) setMessage(`生成完成，终图 ${finalCount} 张`)
+      } else if (job.status === 'failed') {
+        setMessage(job.message || '生成失败', true)
+      }
+    }
+  }
+
   function applyJobDetail(detail) {
     job.status = detail.status || 'unknown'
     job.statusText = statusLabel(job.status)
@@ -412,6 +701,22 @@ export function createAppStore() {
     job.currentNode = detail.current_node ?? null
     job.progress = detail.progress ?? null
     job.images = detail.images || []
+    if (detail.execution_track_nodes?.length && !job.trackPipelineNodes.length) {
+      const byId = new Map(pipelineNodes.value.map((n) => [String(n.node_id), n]))
+      job.trackPipelineNodes = detail.execution_track_nodes
+        .map((id) => byId.get(String(id)))
+        .filter(Boolean)
+    }
+    const trackForMerge =
+      job.trackPipelineNodes?.length > 0
+        ? job.trackPipelineNodes
+        : (detail.execution_track_nodes || []).map((id) => ({ node_id: id }))
+    job.completedNodeIds = mergeCompletedNodeIds(
+      job.completedNodeIds,
+      detail.completed_nodes,
+      trackForMerge,
+      detail.current_node,
+    )
   }
 
   async function pollJobUntilDone(promptId) {
@@ -429,15 +734,25 @@ export function createAppStore() {
     }
     if (detail.status === 'completed') {
       stopPoll()
-      if (job.images.length) {
-        setMessage(`生成完成，共 ${job.images.length} 张`)
+      const previewIds = new Set(
+        (job.trackPipelineNodes || [])
+          .filter((n) => n.is_preview)
+          .map((n) => String(n.node_id)),
+      )
+      const finalCount = (job.images || []).filter(
+        (img) => !previewIds.has(String(img.node_id)),
+      ).length
+      const previewCount = (job.images || []).length - finalCount
+      if (finalCount) {
+        const extra =
+          previewCount > 0 ? `；${previewCount} 张预览请在节点进度处查看` : ''
+        setMessage(`生成完成，终图 ${finalCount} 张${extra}`)
+      } else if (previewCount) {
+        setMessage(`生成完成，预览 ${previewCount} 张（见节点下方「点击查看」）`)
       } else {
         setMessage(job.message || '未找到输出', true)
       }
       return
-    }
-    if (detail.status === 'finalizing') {
-      setTimeout(() => pollJobOnce(promptId), 500)
     }
   }
 
@@ -451,8 +766,15 @@ export function createAppStore() {
 
   function startJobPolling(promptId) {
     stopPoll()
-    pollJobOnce(promptId)
-    pollTimer = setInterval(() => pollJobOnce(promptId), 1000)
+    if (isGenerateWsConnected()) {
+      void pollJobOnce(promptId)
+      return
+    }
+    pollActive = true
+    pollBurstCount = 0
+    void pollJobOnce(promptId).finally(() => {
+      if (pollActive) scheduleJobPoll(promptId)
+    })
   }
 
   function hasSessionPrompts() {
@@ -481,25 +803,53 @@ export function createAppStore() {
     }
   }
 
-  async function queueWorkflow() {
-    if (!selectedId.value || isGeneratingNow()) return
+  async function queueWorkflowCore() {
+    if (!selectedId.value) return
     loading.value = true
     resetJob()
     stopPoll()
     try {
-      const batchPrompts = hasSessionPrompts()
-        ? serializePromptConfig(sessionPrompts)
-        : null
-      const seed =
-        batchPrompts && workflowTargets.value?.seed_nodes?.[0]?.seed != null
-          ? Number(workflowTargets.value.seed_nodes[0].seed)
-          : null
+      const { getBatchStore } = await import('@/stores/useBatchStore.js')
+      const { buildSeedOverridePatch, resolveSeedValue } = await import('@/lib/queueSeed.js')
+      const batch = getBatchStore()
+      const seedNodes = workflowTargets.value?.seed_nodes || []
+      let promptSeed = null
+      if (seedNodes.length) {
+        promptSeed = resolveSeedValue(batch.form)
+        applyOverridesPatch(buildSeedOverridePatch(seedNodes, promptSeed), { force: true })
+      }
+      const { buildFinalPromptOverrides } = await import(
+        '@/lib/buildFinalPromptOverrides.js'
+      )
+      const finalPrompts = await buildFinalPromptOverrides(
+        {
+          selectedId: selectedId.value,
+          overrides,
+          sessionPrompts,
+          styleEnabled: styleEnabled.value,
+          promptEncode: promptEncode.value,
+        },
+        { promptSeed },
+      )
+      lastQueuedPrompts.value = {
+        positive: finalPrompts.positive,
+        negative: finalPrompts.negative,
+        promptPicks: finalPrompts.promptPicks,
+        at: Date.now(),
+      }
+      const trackNodes = filterPipelineForExecution(
+        pipelineNodes.value,
+        enabledPreviewNodeIds.value,
+      )
       const res = await api.queueWorkflow(
         selectedId.value,
-        { ...overrides },
+        finalPrompts.overrides,
         styleEnabled.value,
-        batchPrompts,
-        seed,
+        null,
+        promptSeed,
+        [...(enabledPreviewNodeIds.value || [])],
+        sessionLoraPayloadForQueue(),
+        true,
       )
       Object.assign(job, {
         promptId: res.prompt_id,
@@ -507,17 +857,35 @@ export function createAppStore() {
         status: 'pending',
         statusText: statusLabel('pending'),
         message: '已提交，等待 ComfyUI 执行…',
+        trackPipelineNodes: trackNodes,
+        completedNodeIds: [],
       })
       applyQuotaFromApi(res)
       setMessage(`已提交，任务 ID: ${job.promptId}`)
       startJobPolling(job.promptId)
+      return { promptId: job.promptId }
     } catch (e) {
       setMessage(e.message, true)
       job.status = 'failed'
       job.statusText = statusLabel('failed')
+      throw e
     } finally {
       loading.value = false
     }
+  }
+
+  async function queueWorkflow() {
+    if (!selectedId.value) return
+    const { getGenerateQueueStore } = await import('@/stores/useGenerateQueueStore.js')
+    const queue = getGenerateQueueStore()
+    if (queue) {
+      return queue.submit({
+        type: 'single',
+        label: '单张生成',
+        run: queueWorkflowCore,
+      })
+    }
+    return queueWorkflowCore()
   }
 
   async function deleteOutputs() {
@@ -571,7 +939,14 @@ export function createAppStore() {
     sessionPromptPresetId,
     sessionPromptPresetName,
     promptEncode,
+    pipelineNodes,
+    previewNodes,
+    enabledPreviewNodeIds,
     restoreEpoch,
+    temporaryWorkflowActive,
+    temporaryWorkflowHint,
+    sessionLoraChain,
+    lastQueuedPrompts,
 
     get groupedNodes() {
       const map = new Map()
@@ -593,6 +968,31 @@ export function createAppStore() {
     },
     get workflowLorasForUi() {
       return workflowLoras.value
+    },
+    get lorasForRun() {
+      if (sessionLoraChain.value) {
+        return buildSessionLorasForUi(
+          sessionLoraChain.value,
+          workflowLoras.value,
+          overrides,
+        )
+      }
+      return workflowLoras.value
+    },
+    get pipelineNodesForUi() {
+      return pipelineNodes.value
+    },
+    get previewNodesForUi() {
+      return previewNodes.value
+    },
+    get executionPipelineNodesForUi() {
+      return filterPipelineForExecution(
+        pipelineNodes.value,
+        enabledPreviewNodeIds.value,
+      )
+    },
+    get enabledPreviewNodeIdsForUi() {
+      return enabledPreviewNodeIds.value
     },
     get progressPercent() {
       if (job.progress == null) return null
@@ -619,8 +1019,23 @@ export function createAppStore() {
     hasSessionPrompts,
     applyFavorite,
     applyWorkflowSnapshot,
+    clearTemporaryWorkflow,
     saveWorkflow,
+    addLoraChainSlot,
+    removeLoraChainSlot,
+    reorderLoraChain,
+    initSessionLoraChain,
+    resetSessionLoraChain,
+    sessionAddLora,
+    sessionRemoveLora,
+    sessionMoveLora,
+    sessionReorderLoras,
+    sessionLoraPayloadForQueue,
+    savePreviewNodeSelection,
+    setEnabledPreviewNodeIds,
+    previewNodeLabel,
     applyJobDetail,
+    applyWsJobEvent,
     queueWorkflow,
     cancelWorkflow,
     deleteOutputs,

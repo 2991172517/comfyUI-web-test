@@ -83,6 +83,22 @@ export const api = {
   deleteInvite: (id) =>
     request(`/api/admin/invites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   health: () => request('/api/health'),
+  uploadComfyImage: async (file, { overwrite = true } = {}) => {
+    const fd = new FormData()
+    fd.append('image', file, file.name || 'upload.png')
+    fd.append('overwrite', overwrite ? 'true' : 'false')
+    const res = await fetch('/api/comfy/upload-image', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const detail = data.detail
+      throw new Error(typeof detail === 'string' ? detail : data.error || res.statusText)
+    }
+    return data
+  },
   listWorkflows: () => request('/api/workflows'),
   getWorkflowTemplate: () => request('/api/workflow-template'),
   listWorkflowVariants: () => request('/api/workflow-variants'),
@@ -105,11 +121,12 @@ export const api = {
     if (!res.ok) throw new Error(data.detail || res.statusText)
     return data
   },
-  importWorkflow: async (file, { variant_id, display_name } = {}) => {
+  importWorkflow: async (file, { variant_id, display_name, category } = {}) => {
     const fd = new FormData()
     fd.append('file', file)
     if (variant_id) fd.append('variant_id', variant_id)
     if (display_name) fd.append('display_name', display_name)
+    if (category) fd.append('category', category)
     const res = await fetch('/api/workflow-import', {
       method: 'POST',
       headers: authHeaders(),
@@ -151,11 +168,18 @@ export const api = {
     request(`/api/workflows/${wfPath(id)}/lora-slots/${encodeURIComponent(nodeId)}`, {
       method: 'DELETE',
     }),
+  reorderLoraSlots: (id, nodeIds) =>
+    request(`/api/workflows/${wfPath(id)}/lora-slots/order`, {
+      method: 'PUT',
+      body: JSON.stringify({ node_ids: nodeIds }),
+    }),
   getWorkflow: (id, styleEnabled = null) => {
     const q =
       styleEnabled === null ? '' : `?style_enabled=${styleEnabled ? '1' : '0'}`
     return request(`/api/workflows/${wfPath(id)}${q}`)
   },
+  getWorkflowPreviewNodes: (id) =>
+    request(`/api/workflows/${wfPath(id)}/preview-nodes`),
   saveWorkflow: (id, overrides) =>
     request(`/api/workflows/${wfPath(id)}`, {
       method: 'PUT',
@@ -172,7 +196,16 @@ export const api = {
     }),
   deletePromptPreset: (id) =>
     request(`/api/prompt-presets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  queueWorkflow: (id, overrides, styleEnabled = null, batchPrompts = null, promptSeed = null) =>
+  queueWorkflow: (
+    id,
+    overrides,
+    styleEnabled = null,
+    batchPrompts = null,
+    promptSeed = null,
+    enabledPreviewNodeIds = null,
+    loraChainSession = null,
+    promptsPremerged = false,
+  ) =>
     request(`/api/workflows/${wfPath(id)}/queue`, {
       method: 'POST',
       body: JSON.stringify({
@@ -180,6 +213,11 @@ export const api = {
         ...(styleEnabled !== null ? { style_enabled: styleEnabled } : {}),
         ...(batchPrompts ? { batch_prompts: batchPrompts } : {}),
         ...(promptSeed != null ? { prompt_seed: promptSeed } : {}),
+        ...(enabledPreviewNodeIds != null
+          ? { enabled_preview_node_ids: enabledPreviewNodeIds }
+          : {}),
+        ...(loraChainSession ? { lora_chain_session: loraChainSession } : {}),
+        ...(promptsPremerged ? { prompts_premerged: true } : {}),
       }),
     }),
   getJob: (promptId) => request(`/api/jobs/${promptId}`),
@@ -190,8 +228,8 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify(images ? { images } : {}),
     }),
-  batchPreview: (workflowId, body) =>
-    request(`/api/workflows/${wfPath(workflowId)}/batch/preview`, {
+  buildImageRestoreSnapshot: (body) =>
+    request('/api/images/restore-snapshot', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -207,6 +245,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getModelFolderPaths: () => request('/api/models/folder-paths'),
+  getModelPathSettings: () => request('/api/models/path-settings'),
+  saveModelPathSettings: (body) =>
+    request('/api/models/path-settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   openModelFolder: (folder) =>
     request('/api/models/open-folder', {
       method: 'POST',
@@ -477,6 +521,25 @@ export const api = {
     }),
   vocabularyStats: () => request('/api/vocabulary/stats'),
   vocabularyRebuild: () => request('/api/vocabulary/rebuild', { method: 'POST' }),
+  vocabularyMergeSchema: () => request('/api/vocabulary/merge-manifest/schema'),
+  async vocabularyMergeManifest(file, { dryRun = false } = {}) {
+    const fd = new FormData()
+    fd.append('file', file)
+    const q = dryRun ? '?dry_run=true' : ''
+    const token = getAccessToken()
+    const res = await fetch(`/api/vocabulary/merge-manifest${q}`, {
+      method: 'POST',
+      headers: token ? { 'X-Access-Token': token } : {},
+      body: fd,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(
+        typeof data.detail === 'string' ? data.detail : data.error || res.statusText,
+      )
+    }
+    return data
+  },
   vocabularyCategoryTree: () => request('/api/vocabulary/categories/tree'),
   vocabularyListPrompts: (categoryId, { q = '', offset = 0, limit = 80 } = {}) => {
     const params = new URLSearchParams({

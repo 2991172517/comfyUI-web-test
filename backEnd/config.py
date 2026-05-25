@@ -55,6 +55,8 @@ COMFYUI_ROOT = _detect_comfyui_root()
 WORKFLOWS_REL = "CustomProject/workflows"
 WORKFLOWS_DIR = PROJECT_ROOT / "workflows"
 WORKFLOW_TEMPLATE_ID = "First_api"
+WORKFLOW_SEED_ID = "default_api"
+WORKFLOW_HIDDEN_IDS = frozenset({WORKFLOW_TEMPLATE_ID, WORKFLOW_SEED_ID})
 WORKFLOW_VARIANTS_DIR = WORKFLOWS_DIR / "variants"
 
 EDITABLE_CONFIG = BACKEND_DIR / "editable_config.json"

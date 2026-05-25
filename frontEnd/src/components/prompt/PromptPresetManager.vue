@@ -65,8 +65,10 @@ async function persistPreset() {
     await nextTick()
     suppressSave.value = false
   } else {
-    await api.updatePromptPreset(selectedId.value, body)
+    const res = await api.updatePromptPreset(selectedId.value, body)
     await refresh()
+    if (res?.preset?.name) draftName.value = res.preset.name
+    if (res?.preset?.description != null) draftDesc.value = res.preset.description
   }
 }
 
@@ -152,7 +154,7 @@ defineExpose({ flush })
     <CardHeader v-if="!embedded" class="pb-2">
       <CardTitle class="text-base">提示词预设</CardTitle>
       <CardDescription>
-        左侧选择预设，右侧编辑细节；修改后自动保存。抽卡/批量页通过「导入预设」载入。
+        左侧选择预设，右侧编辑正/负全文与随机组；修改后自动保存。抽卡页通过「导入预设」写入工作流底稿。
       </CardDescription>
     </CardHeader>
     <p v-else class="text-xs text-muted-foreground">
@@ -270,13 +272,11 @@ defineExpose({ flush })
           </div>
 
           <PromptConfigEditor
-            :fixed="draft.fixed"
             :random-groups="draft.random_groups"
-            :show-fixed="true"
-            :show-random="true"
+            :random-bundle-groups="draft.random_bundle_groups"
             compact
-            @update:fixed="draft.fixed = $event"
             @update:random-groups="draft.random_groups = $event"
+            @update:random-bundle-groups="draft.random_bundle_groups = $event"
           />
         </section>
       </div>

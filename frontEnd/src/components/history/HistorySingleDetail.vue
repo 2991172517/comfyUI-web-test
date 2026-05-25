@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { useAppStore } from '@/stores/useAppStore.js'
-import { encodeWorkflowSnapshot, persistRestoreSnapshot } from '@/lib/workflowRestore.js'
+import { buildRegenerateRestoreRoute } from '@/lib/regenerateFromImage.js'
 import HistoryMetaPanel from '@/components/history/HistoryMetaPanel.vue'
 import HistoryImageDetailModal from '@/components/history/HistoryImageDetailModal.vue'
 import Button from '@/components/ui/Button.vue'
@@ -38,15 +38,31 @@ const detailMeta = computed(() => {
   }
 })
 
-function regenerate() {
-  const snap = entry.value?.workflow_snapshot
-  if (!snap?.workflow_id) return
-  const restoreKey = persistRestoreSnapshot(entry.value.prompt_id, 0, snap)
-  const query = { workflow: snap.workflow_id }
-  if (restoreKey) query.restoreKey = restoreKey
-  const encoded = encodeWorkflowSnapshot(snap)
-  if (encoded && encoded.length < 2400) query.restore = encoded
-  router.push({ path: '/generate', query })
+async function regenerate() {
+  const e = entry.value
+  if (!e) return
+  try {
+    const route = await buildRegenerateRestoreRoute({
+      cell: {
+        images: e.images,
+        workflow_snapshot: e.workflow_snapshot,
+        overrides: e.overrides,
+        index: 0,
+        seed: e.meta?.sampler?.seed,
+      },
+      runConfig: { workflow_id: e.workflow_id },
+      batchId: e.prompt_id,
+      cellIndex: 0,
+    })
+    if (!route) {
+      app.setMessage('缺少工作流信息，无法恢复', true)
+      return
+    }
+    if (route.message) app.setMessage(route.message)
+    router.push({ path: '/generate', query: route.query })
+  } catch (err) {
+    app.setMessage(err.message || '无法从图片恢复工作流', true)
+  }
 }
 
 function favPayload() {

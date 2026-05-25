@@ -1,6 +1,5 @@
 <script setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
-import { collapseOut, staggerReveal } from '@/lib/gsap/motion.js'
+import { ref } from 'vue'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { isAdmin } from '@/composables/useAuth.js'
@@ -10,34 +9,25 @@ import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
 import { cn } from '@/lib/utils'
 import { Check, Grid3x3, ImageIcon } from 'lucide-vue-next'
 import ImageMagnifierPreview from '@/components/media/ImageMagnifierPreview.vue'
+import InpaintJumpButton from '@/components/inpaint/InpaintJumpButton.vue'
+import { buildInpaintPayloadFromHistory } from '@/lib/inpaintBootstrap.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
+import {
+  historyCardGridStyle,
+  historyCardImgClass,
+  historyCardIsNatural,
+  historyCardThumbBoxStyle,
+} from '@/composables/useHistoryCardLayout.js'
 
 const history = useHistoryStore()
 const { confirmDelete } = useConfirmDialog()
 const app = useAppStore()
 const deleting = ref(false)
-const gridRef = ref(null)
 
-async function revealList() {
-  await nextTick()
-  const items = gridRef.value?.querySelectorAll('[data-stagger-item]')
-  if (!items?.length) return
-  staggerReveal(items, { duration: 0.16, stagger: 0.018 })
-}
-
-onMounted(revealList)
-watch(() => history.records.length, revealList)
-
-async function animateRemove(el, fn) {
-  if (el) await collapseOut(el)
-  await fn()
-  revealList()
-}
 const emit = defineEmits(['preview-image'])
 
 async function deleteRecord(ev, rec) {
   ev.stopPropagation()
-  const card = ev.currentTarget?.closest?.('[data-stagger-item]')
   if (rec.type === 'batch') {
     const id = rec.batch_id || rec.id
     if (
@@ -48,7 +38,7 @@ async function deleteRecord(ev, rec) {
       return
     deleting.value = true
     try {
-      await animateRemove(card, () => history.deleteBatch(id))
+      await history.deleteBatch(id)
       app.setMessage('已删除批量记录')
     } catch (e) {
       app.setMessage(e.message, true)
@@ -66,7 +56,7 @@ async function deleteRecord(ev, rec) {
     return
   deleting.value = true
   try {
-    await animateRemove(card, () => history.deleteSingle(pid))
+    await history.deleteSingle(pid)
     app.setMessage('已删除单抽记录')
   } catch (e) {
     app.setMessage(e.message, true)
@@ -130,18 +120,19 @@ function statusBadgeVariant(status) {
   >
     多选模式：点击图片或卡片勾选；已选 {{ history.selectedKeys.size }} 条。
   </p>
-  <div
+  <TransitionGroup
     v-if="history.records.length || history.loading"
-    ref="gridRef"
-    class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    tag="div"
+    name="history-card"
+    class="history-feed-grid grid gap-4"
+    :style="historyCardGridStyle"
   >
     <article
       v-for="rec in history.records"
       :key="rec.id"
-      data-stagger-item
       :class="
         cn(
-          'group relative overflow-visible rounded-xl border-2 bg-card transition-[box-shadow,border-color] duration-200 hover:shadow-md',
+          'group relative w-full max-w-full overflow-visible rounded-xl border-2 bg-card transition-[box-shadow,border-color] duration-200 hover:shadow-md',
           rec.type === 'batch'
             ? 'border-violet-500/40 hover:border-violet-500/70'
             : 'border-sky-500/35 hover:border-sky-500/60',
@@ -152,14 +143,20 @@ function statusBadgeVariant(status) {
       "
     >
       <div
-        class="relative aspect-[4/5] overflow-hidden rounded-t-[10px] bg-muted/40"
-        :class="history.bulkSelectMode ? 'cursor-pointer' : 'cursor-zoom-in'"
+        class="relative overflow-hidden rounded-t-[10px] bg-muted/40 flex items-center justify-center"
+        :class="[
+          history.bulkSelectMode ? 'cursor-pointer' : 'cursor-zoom-in',
+          historyCardIsNatural ? 'min-h-[8rem]' : '',
+        ]"
+        :style="historyCardThumbBoxStyle"
         @click.stop="previewImage($event, rec)"
       >
         <ImageMagnifierPreview
           v-if="rec.thumbnail_url"
-          fill
+          :fill="!historyCardIsNatural"
           :src="rec.thumbnail_url"
+          :img-class="historyCardImgClass"
+          :root-class="historyCardIsNatural ? 'relative w-full' : ''"
           :disabled="history.bulkSelectMode"
         />
         <span
@@ -203,6 +200,20 @@ function statusBadgeVariant(status) {
           >
             {{ rec.completed }}/{{ rec.total }}
           </Badge>
+        </div>
+
+        <div
+          v-if="
+            rec.type === 'single' &&
+            (rec.thumbnail_url || rec.images?.[0]?.url) &&
+            !history.bulkSelectMode
+          "
+          class="absolute right-2 bottom-2 z-20 pointer-events-auto"
+        >
+          <InpaintJumpButton
+            size="sm"
+            :get-payload="() => buildInpaintPayloadFromHistory(rec)"
+          />
         </div>
 
         <button
@@ -254,5 +265,19 @@ function statusBadgeVariant(status) {
         </Badge>
       </div>
     </article>
-  </div>
+  </TransitionGroup>
 </template>
+
+<style scoped>
+.history-card-leave-active {
+  transition: opacity 0.15s ease;
+}
+.history-card-leave-to {
+  opacity: 0;
+}
+
+/* TransitionGroup 根节点需占满宽，列宽由 gridTemplateColumns 控制 */
+.history-feed-grid {
+  width: 100%;
+}
+</style>

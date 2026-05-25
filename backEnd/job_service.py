@@ -98,6 +98,27 @@ def cancel_job(prompt_id: str) -> dict:
     return {"ok": True, "prompt_id": pid, "status": "cancelled"}
 
 
+def _enrich_completed_nodes(
+    track_nodes: list[str],
+    completed_nodes: list[str],
+    current_node: str | None,
+) -> list[str]:
+    """当前节点之前的轨道节点均视为已完成（弥补 WS 与 HTTP 轮询之间的漏记）。"""
+    done = list(completed_nodes or [])
+    seen = {str(x) for x in done}
+    if current_node is None or not track_nodes:
+        return done
+    cur = str(current_node)
+    for nid in track_nodes:
+        ns = str(nid)
+        if ns == cur:
+            break
+        if ns not in seen:
+            done.append(ns)
+            seen.add(ns)
+    return done
+
+
 def get_job_detail(prompt_id: str) -> dict:
     tracked = ws_tracker.get_tracker_state(prompt_id)
 
@@ -131,10 +152,25 @@ def _build_job_response(prompt_id: str, tracked: dict, job: dict | None) -> dict
             "preview_output": (job or {}).get("preview_output"),
             "outputs_count": (job or {}).get("outputs_count", 0),
             "execution_error": (job or {}).get("execution_error"),
+            "completed_nodes": _enrich_completed_nodes(
+                list(tracked.get("execution_track_nodes") or []),
+                list(tracked.get("completed_nodes") or []),
+                tracked.get("current_node"),
+            ),
+            "execution_track_nodes": list(tracked.get("execution_track_nodes") or []),
         }
 
     if tracked.get("error") and status not in ("completed",):
         status = "failed"
+
+    track_nodes = list(tracked.get("execution_track_nodes") or [])
+    completed_nodes = _enrich_completed_nodes(
+        track_nodes,
+        list(tracked.get("completed_nodes") or []),
+        tracked.get("current_node"),
+    )
+    if status == "completed" and track_nodes:
+        completed_nodes = list(track_nodes)
 
     if status == "completed":
         if job:
@@ -173,6 +209,8 @@ def _build_job_response(prompt_id: str, tracked: dict, job: dict | None) -> dict
         "preview_output": (job or {}).get("preview_output"),
         "outputs_count": (job or {}).get("outputs_count", 0),
         "execution_error": (job or {}).get("execution_error"),
+        "completed_nodes": completed_nodes,
+        "execution_track_nodes": track_nodes,
     }
 
 

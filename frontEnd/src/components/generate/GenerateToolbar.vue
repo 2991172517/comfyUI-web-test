@@ -16,8 +16,7 @@ const store = useAppStore()
     </Button>
     <Button
       variant="secondary"
-      :disabled="store.loading || !store.selectedId || store.isMasterWorkflow"
-      :title="store.isMasterWorkflow ? '母版只读，请在工作流页另存子工作流' : ''"
+      :disabled="store.loading || !store.selectedId"
       @click="store.saveWorkflow"
     >
       保存参数

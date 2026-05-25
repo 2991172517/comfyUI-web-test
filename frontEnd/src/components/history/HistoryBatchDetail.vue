@@ -3,11 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useHistoryStore } from '@/stores/useHistoryStore.js'
 import { useAppStore } from '@/stores/useAppStore.js'
-import {
-  encodeWorkflowSnapshot,
-  persistRestoreSnapshot,
-  snapshotFromBatchCell,
-} from '@/lib/workflowRestore.js'
+import { buildRegenerateRestoreRoute } from '@/lib/regenerateFromImage.js'
 import { statusLabel } from '@/api/client.js'
 import HistoryMetaPanel from '@/components/history/HistoryMetaPanel.vue'
 import HistoryBatchCellCard from '@/components/history/HistoryBatchCellCard.vue'
@@ -21,10 +17,16 @@ import SelectNative from '@/components/ui/SelectNative.vue'
 import { buildCellDetailMeta } from '@/lib/cellDetailMeta.js'
 import { cellSelectionKey, cellSelectionLabel } from '@/lib/promptCompare.js'
 import { buildBatchFavoritePayload } from '@/utils/favoritePayload.js'
-import { ArrowLeft, GitCompare, Trash2 } from 'lucide-vue-next'
+import AnimatedCollapse from '@/components/ui/AnimatedCollapse.vue'
+import { ArrowLeft, ChevronDown, ChevronUp, GitCompare, Trash2 } from 'lucide-vue-next'
 import { isAdmin } from '@/composables/useAuth.js'
 import { useImageDownload } from '@/composables/useImageDownload.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
+import {
+  historyBatchMatrixGridStyle,
+  historyCardLayout,
+} from '@/composables/useHistoryCardLayout.js'
+import MediaCardLayoutControls from '@/components/shared/MediaCardLayoutControls.vue'
 
 const emit = defineEmits(['back', 'deleted'])
 
@@ -33,6 +35,7 @@ const { confirmDelete } = useConfirmDialog()
 const app = useAppStore()
 const router = useRouter()
 const deleting = ref(false)
+const batchInfoOpen = ref(false)
 const lightboxRef = ref(null)
 const detailOpen = ref(false)
 const detailMeta = ref(null)
@@ -86,11 +89,17 @@ const flatCells = computed(() => {
   return list
 })
 
-const gridColumnsStyle = computed(() => ({
-  gridTemplateColumns: isMatrixLayout.value
-    ? `2.5rem repeat(${colsPerRow.value}, minmax(0, 1fr))`
-    : `repeat(${colsPerRow.value}, minmax(0, 1fr))`,
-}))
+const gridColumnsStyle = computed(() => {
+  if (isMatrixLayout.value) {
+    return historyBatchMatrixGridStyle(colsPerRow.value)
+  }
+  const w = historyCardLayout.cardWidth
+  const cols = Math.max(1, colsPerRow.value)
+  return {
+    gridTemplateColumns: `repeat(${cols}, ${w}px)`,
+    justifyContent: 'start',
+  }
+})
 
 const colOptions = computed(() => {
   const max = Math.max(sweepCols.value, 12)
@@ -108,6 +117,7 @@ watch(
 watch(
   () => entry.value?.batch_id,
   () => {
+    batchInfoOpen.value = false
     selectMode.value = false
     selectedKeys.value = new Set()
     compareOpen.value = false
@@ -159,12 +169,22 @@ function openCellLightbox(cell) {
 }
 
 async function regenerateFromCell(cell) {
-  const snap = snapshotFromBatchCell(cell, entry.value?.run_config)
-  const wid = snap.workflow_id || entry.value?.workflow_id
-  const restoreKey = persistRestoreSnapshot(entry.value?.batch_id, cell.index, snap)
-  const query = { workflow: wid }
-  if (restoreKey) query.restoreKey = restoreKey
-  router.push({ path: '/generate', query })
+  try {
+    const route = await buildRegenerateRestoreRoute({
+      cell,
+      runConfig: entry.value?.run_config,
+      batchId: entry.value?.batch_id,
+      cellIndex: cell.index,
+    })
+    if (!route) {
+      app.setMessage('缺少工作流信息，无法恢复', true)
+      return
+    }
+    if (route.message) app.setMessage(route.message)
+    router.push({ path: '/generate', query: route.query })
+  } catch (e) {
+    app.setMessage(e.message || '无法从图片恢复工作流', true)
+  }
 }
 
 function favoritePayload(cell) {
@@ -334,7 +354,25 @@ async function deleteWholeBatch() {
             · 扫参 {{ sweepRows }}×{{ sweepCols }}（行=A · 列=B）
           </template>
         </p>
-        <HistoryMetaPanel class="mt-4" :meta="entry.meta" :workflow-id="entry.workflow_id" />
+        <div v-if="entry.meta" class="mt-3 border-t border-violet-500/20 pt-3">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-2 text-left text-sm font-medium hover:text-primary transition-colors"
+            @click="batchInfoOpen = !batchInfoOpen"
+          >
+            <span>批量生成信息</span>
+            <span class="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+              {{ batchInfoOpen ? '收起' : '展开' }}
+              <component
+                :is="batchInfoOpen ? ChevronUp : ChevronDown"
+                class="h-4 w-4 shrink-0"
+              />
+            </span>
+          </button>
+          <AnimatedCollapse v-model="batchInfoOpen">
+            <HistoryMetaPanel class="mt-3" :meta="entry.meta" :workflow-id="entry.workflow_id" />
+          </AnimatedCollapse>
+        </div>
         <div class="mt-3 flex flex-wrap gap-2">
           <Button
             v-if="isAdmin()"
@@ -438,14 +476,17 @@ async function deleteWholeBatch() {
           可全选后删除多张，或勾选至少 2 张后「对比提示词」。
         </p>
 
-        <div class="w-full rounded-lg border border-border bg-card/40 p-3 md:p-4">
+        <MediaCardLayoutControls class="mb-1" />
+
+        <div class="w-full overflow-x-auto rounded-lg border border-border bg-card/40 p-3 md:p-4">
           <!-- 默认 A×B：行=A 档，列=B 档 -->
-          <div v-if="isMatrixLayout" class="grid w-full gap-2" :style="gridColumnsStyle">
+          <div v-if="isMatrixLayout" class="grid gap-2 w-max min-w-full" :style="gridColumnsStyle">
             <div />
             <div
               v-for="ib in matrix.cols"
               :key="'h-' + ib"
-              class="py-1 text-center text-[10px] font-medium text-muted-foreground"
+              class="flex items-center justify-center py-1 text-center text-[10px] font-medium text-muted-foreground"
+              :style="{ width: historyCardLayout.cardWidth + 'px' }"
             >
               B{{ ib }}
             </div>
@@ -474,7 +515,7 @@ async function deleteWholeBatch() {
           </div>
 
           <!-- 自定义每行张数：按序号平铺 -->
-          <div v-else class="grid w-full gap-3" :style="gridColumnsStyle">
+          <div v-else class="grid gap-3 w-max min-w-full" :style="gridColumnsStyle">
             <HistoryBatchCellCard
               v-for="{ cell, ia, ib } in flatCells"
               :key="`${ia}-${ib}`"

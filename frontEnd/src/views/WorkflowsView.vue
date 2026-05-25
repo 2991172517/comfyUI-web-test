@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Plus, Upload } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { useAppStore } from '@/stores/useAppStore.js'
@@ -21,8 +21,6 @@ const selectedId = ref('')
 const showImport = ref(false)
 const showCreate = ref(false)
 
-const variantCount = computed(() => workflows.value.filter((w) => w.is_variant).length)
-
 async function refresh() {
   const res = await api.listWorkflows()
   workflows.value = (res.workflows || []).filter(
@@ -35,9 +33,7 @@ async function refresh() {
   }
   if (!selectedId.value && workflows.value.length) {
     const pick =
-      workflows.value.find((w) => w.is_master) ||
-      workflows.value.find((w) => w.id === 'First_api') ||
-      workflows.value[0]
+      workflows.value.find((w) => w.category === 'generate') || workflows.value[0]
     selectedId.value = pick?.id || ''
   }
 }
@@ -81,7 +77,7 @@ onMounted(async () => {
       <div class="max-w-2xl space-y-1">
         <h2 class="text-lg font-semibold">工作流配置</h2>
         <p class="text-sm text-muted-foreground">
-          左侧树形浏览母版与子工作流；右侧按 Checkpoint / LoRA / 其他 查看与编辑，布局与抽卡页一致。
+          左侧按分类浏览工作流；右侧按 Checkpoint / LoRA / 其他 查看与编辑，布局与抽卡页一致。
         </p>
       </div>
       <div class="flex shrink-0 flex-wrap gap-2">
@@ -91,7 +87,7 @@ onMounted(async () => {
         </Button>
         <Button size="sm" class="gap-1.5" @click="showCreate = true">
           <Plus class="h-4 w-4" />
-          新建子工作流
+          新建工作流
         </Button>
       </div>
     </div>
@@ -102,7 +98,7 @@ onMounted(async () => {
           <CardHeader class="pb-2">
             <CardTitle class="text-base">工作流树</CardTitle>
             <p class="text-xs text-muted-foreground">
-              {{ workflows.length }} 项 · {{ variantCount }} 个子工作流
+              {{ workflows.length }} 个工作流
             </p>
           </CardHeader>
           <CardContent class="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
@@ -125,6 +121,6 @@ onMounted(async () => {
     </div>
 
     <WorkflowImportDialog v-model:open="showImport" @imported="onImported" />
-    <WorkflowCreateDialog v-model:open="showCreate" @created="onCreated" />
+    <WorkflowCreateDialog v-model:open="showCreate" :workflows="workflows" @created="onCreated" />
   </div>
 </template>

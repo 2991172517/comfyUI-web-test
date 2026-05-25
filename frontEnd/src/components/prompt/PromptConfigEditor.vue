@@ -1,36 +1,39 @@
 <script setup>
-import PromptFixedFields from '@/components/prompt/PromptFixedFields.vue'
 import PromptRandomGroupList from '@/components/prompt/PromptRandomGroupList.vue'
+import PromptRandomBundleGroupList from '@/components/prompt/PromptRandomBundleGroupList.vue'
 
 defineProps({
-  fixed: { type: Object, required: true },
   randomGroups: { type: Array, required: true },
+  randomBundleGroups: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
-  showFixed: { type: Boolean, default: true },
   showRandom: { type: Boolean, default: true },
+  showBundles: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['update:randomGroups', 'update:fixed'])
+const emit = defineEmits(['update:randomGroups', 'update:randomBundleGroups'])
 </script>
 
 <template>
   <div :class="compact ? 'space-y-3' : 'space-y-6'">
-    <div v-if="showFixed">
-      <p :class="compact ? 'text-xs font-medium mb-1.5' : 'text-sm font-medium mb-2'">固定追加</p>
-      <PromptFixedFields
-        :model-value="fixed"
-        :disabled="disabled"
-        :compact="compact"
-        @update:model-value="emit('update:fixed', $event)"
-      />
-    </div>
     <div v-if="showRandom">
-      <p :class="compact ? 'text-xs font-medium mb-1.5' : 'text-sm font-medium mb-2'">随机组</p>
+      <p :class="compact ? 'text-xs font-medium mb-1.5' : 'text-sm font-medium mb-2'">
+        随机词组 <span class="font-normal text-muted-foreground">（每次抽 1 个 tag）</span>
+      </p>
       <PromptRandomGroupList
         :groups="randomGroups"
         :disabled="disabled"
         @update:groups="emit('update:randomGroups', $event)"
+      />
+    </div>
+    <div v-if="showBundles">
+      <p :class="compact ? 'text-xs font-medium mb-1.5' : 'text-sm font-medium mb-2'">
+        随机词串组 <span class="font-normal text-muted-foreground">（每次抽 1 整组）</span>
+      </p>
+      <PromptRandomBundleGroupList
+        :groups="randomBundleGroups"
+        :disabled="disabled"
+        @update:groups="emit('update:randomBundleGroups', $event)"
       />
     </div>
   </div>

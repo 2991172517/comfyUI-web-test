@@ -8,6 +8,7 @@ import ModelFilterPicker from '@/components/models/ModelFilterPicker.vue'
 import Button from '@/components/ui/Button.vue'
 import Label from '@/components/ui/Label.vue'
 import SelectNative from '@/components/ui/SelectNative.vue'
+import MediaCardLayoutControls from '@/components/shared/MediaCardLayoutControls.vue'
 
 const history = useHistoryStore()
 const app = useAppStore()
@@ -146,5 +147,9 @@ onMounted(() => {
         </Button>
       </template>
     </template>
+
+    <span class="hidden lg:block w-px h-6 bg-border self-center" aria-hidden="true" />
+
+    <MediaCardLayoutControls class="w-full lg:w-auto lg:ml-auto" />
   </div>
 </template>

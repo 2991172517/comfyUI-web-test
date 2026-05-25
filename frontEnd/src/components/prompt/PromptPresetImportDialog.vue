@@ -101,7 +101,7 @@ onMounted(() => {
 
         <div class="p-4 space-y-4">
           <p class="text-xs text-muted-foreground leading-relaxed">
-            预设包含随机组与可选的固定前后缀、正/负全文。导入后可在本页展开微调；完整编辑请前往
+            导入后将预设的正/负提示词写入工作流底稿，并载入随机组。可在本页展开微调随机组；完整编辑请前往
             <button
               type="button"
               class="text-primary underline"

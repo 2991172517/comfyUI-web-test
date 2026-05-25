@@ -66,12 +66,12 @@ function onImport(cfg) {
     <CardContent class="space-y-4">
       <PromptPresetPicker :disabled="disabled" @import="onImport" />
       <PromptConfigEditor
-        :fixed="batch.batchPrompts.fixed"
         :random-groups="batch.batchPrompts.random_groups"
+        :random-bundle-groups="batch.batchPrompts.random_bundle_groups"
         :disabled="disabled"
         compact
-        @update:fixed="batch.batchPrompts.fixed = $event"
         @update:random-groups="batch.batchPrompts.random_groups = $event"
+        @update:random-bundle-groups="batch.batchPrompts.random_bundle_groups = $event"
       />
     </CardContent>
   </Card>

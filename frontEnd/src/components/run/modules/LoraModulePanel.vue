@@ -1,11 +1,12 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { Plus } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { Plus, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
 import { useCheckpointLoraCompat } from '@/composables/useCheckpointLoraCompat.js'
+import { useConfirmDialog } from '@/composables/useConfirmDialog.js'
 import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
+import IconDeleteButton from '@/components/ui/IconDeleteButton.vue'
 import Label from '@/components/ui/Label.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Slider from '@/components/ui/Slider.vue'
@@ -13,41 +14,103 @@ import NumberStepper from '@/components/ui/NumberStepper.vue'
 import DirectionToggle from '@/components/ui/DirectionToggle.vue'
 import LoraStrengthControl from '@/components/models/LoraStrengthControl.vue'
 import LoraModelPicker from '@/components/models/LoraModelPicker.vue'
-import LoraPickDialog from '@/components/models/LoraPickDialog.vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps({
   batchMode: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   manageChain: { type: Boolean, default: false },
-  maxSlots: { type: Number, default: 5 },
+  reorderable: { type: Boolean, default: false },
+  /** 生成页：仅本次运行，不写回工作流 JSON */
+  sessionOnly: { type: Boolean, default: false },
+  maxSlots: { type: Number, default: null },
 })
 
-const emit = defineEmits(['remove', 'add'])
+const emit = defineEmits(['remove', 'add', 'reorder'])
 
 const app = useAppStore()
 const batch = useBatchStore()
+const { confirmDelete } = useConfirmDialog()
 const singleSyncPair = ref(true)
 const pickOpen = ref(false)
 
 const activeCheckpoint = computed(() => app.activeCheckpointName)
 const loraCompat = useCheckpointLoraCompat(activeCheckpoint)
 
-const loras = computed(() =>
-  props.batchMode ? batch.loras : app.workflowLorasForUi,
-)
+const loras = computed(() => {
+  if (props.batchMode) return batch.loras
+  if (props.sessionOnly) return app.lorasForRun
+  return app.workflowLorasForUi
+})
 
 const canAdd = computed(
-  () => props.manageChain && !props.batchMode && loras.value.length < props.maxSlots,
+  () =>
+    props.manageChain &&
+    !props.disabled &&
+    (props.maxSlots == null || loras.value.length < props.maxSlots),
 )
 
-watch(
-  () => [app.selectedId, app.workflowLoras],
-  () => {
+const chainHint = computed(() => {
+  if (!props.manageChain) return ''
+  const n = loras.value.length
+  if (props.sessionOnly) {
+    return `${n} 个 · 本次生成临时生效，不修改工作流文件 · 用 ↑↓ 调整顺序`
+  }
+  if (props.maxSlots != null) return `${n} / ${props.maxSlots} · 选定模型后自动串接进链`
+  return `${n} 个 · 用 ↑↓ 调整顺序 · 增删会写入当前子工作流`
+})
+
+function openPickDialog() {
+  if (!canAdd.value) return
+  pickOpen.value = true
+}
+
+onBeforeUnmount(() => {
+  pickOpen.value = false
+})
+
+async function onPickLora(name) {
+  pickOpen.value = false
+  if (props.sessionOnly) {
+    await app.sessionAddLora(name)
     if (props.batchMode) batch.syncLoraAxisState()
-  },
-  { immediate: true, deep: true },
-)
+    return
+  }
+  emit('add', name)
+}
+
+async function onRemove(nodeId) {
+  if (props.sessionOnly) {
+    if (
+      !(await confirmDelete({
+        title: '移除 LoRA',
+        message: '从本次生成的临时链中移除？不会修改工作流文件。',
+      }))
+    ) {
+      return
+    }
+    app.sessionRemoveLora(nodeId)
+    if (props.batchMode) batch.syncLoraAxisState()
+    return
+  }
+  emit('remove', nodeId)
+}
+
+function onMove(nodeId, delta) {
+  if (props.sessionOnly) {
+    app.sessionMoveLora(nodeId, delta)
+    return
+  }
+  const list = loras.value.map((l) => l.node_id)
+  const idx = list.indexOf(nodeId)
+  if (idx < 0) return
+  const to = idx + delta
+  if (to < 0 || to >= list.length) return
+  const next = [...list]
+  const [item] = next.splice(idx, 1)
+  next.splice(to, 0, item)
+  emit('reorder', next)
+}
 
 function loraFileName(l) {
   if (props.batchMode) {
@@ -84,26 +147,11 @@ function singleModel(nodeId, l) {
 function singleClip(nodeId, l) {
   return app.fieldValue(nodeId, { key: 'strength_clip', value: l.strength_clip })
 }
-
-function onPickLora(name) {
-  emit('add', name)
-}
 </script>
 
 <template>
   <div class="space-y-4">
-    <div
-      v-if="manageChain"
-      class="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3"
-    >
-      <Button size="sm" class="gap-1.5" :disabled="disabled || !canAdd" @click="pickOpen = true">
-        <Plus class="h-4 w-4" />
-        添加 LoRA
-      </Button>
-      <span class="text-[11px] text-muted-foreground">
-        {{ loras.length }} / {{ maxSlots }} · 选定模型后自动串接进链
-      </span>
-    </div>
+    <p v-if="manageChain && chainHint" class="text-[11px] text-muted-foreground">{{ chainHint }}</p>
 
     <p
       v-if="activeCheckpoint"
@@ -118,16 +166,12 @@ function onPickLora(name) {
       请先在 Checkpoint 模块选择底模，配置 LoRA 时将显示适配提示。
     </p>
 
-    <p v-if="!loras.length" class="py-4 text-sm text-muted-foreground">
-      {{
-        manageChain
-          ? '链上暂无 LoRA，点击上方「添加 LoRA」从弹窗选择。'
-          : '当前工作流没有 LoRA 节点。'
-      }}
+    <p v-if="!manageChain && !loras.length" class="py-4 text-sm text-muted-foreground">
+      当前工作流没有 LoRA 节点。
     </p>
 
     <div
-      v-else
+      v-if="manageChain || loras.length"
       class="grid gap-4 items-stretch grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))]"
     >
       <article
@@ -135,52 +179,79 @@ function onPickLora(name) {
         :key="l.node_id"
         :class="
           cn(
-            'flex h-full min-w-0 flex-col gap-3 rounded-xl border p-4',
+            'lora-chain-card flex h-full min-w-0 flex-col gap-3 rounded-xl border p-4 transition-colors duration-150',
             batchMode && batch.loraAxisState[l.node_id]?.enabled
               ? 'border-primary/50 bg-primary/5'
               : 'border-border bg-muted/10',
+            l.session_only && 'border-dashed border-primary/25',
           )
         "
       >
         <div class="flex min-h-[1.75rem] shrink-0 items-start justify-between gap-2">
-          <div class="min-w-0 space-y-1">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <span class="truncate text-sm font-semibold">#{{ l.node_id }}</span>
-              <Badge variant="outline" class="text-[10px]">链 {{ chainIdx + 1 }}</Badge>
-              <Badge
-                v-if="batchMode && batch.loraAxisState[l.node_id]?.enabled"
-                variant="default"
-                class="text-[10px]"
+          <div class="flex min-w-0 flex-1 items-start gap-1.5">
+            <div
+              v-if="reorderable"
+              class="flex shrink-0 flex-col gap-0.5"
+            >
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30"
+                :disabled="disabled || chainIdx === 0"
+                aria-label="上移"
+                @click="onMove(l.node_id, -1)"
               >
-                扫参 {{ batch.loraAxisState[l.node_id]?.sweepRole || '?' }}
-              </Badge>
+                <ChevronUp class="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-30"
+                :disabled="disabled || chainIdx === loras.length - 1"
+                aria-label="下移"
+                @click="onMove(l.node_id, 1)"
+              >
+                <ChevronDown class="h-4 w-4" />
+              </button>
+            </div>
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="truncate text-sm font-semibold">
+                  {{ l.session_only ? '临时' : `#${l.node_id}` }}
+                </span>
+                <Badge variant="outline" class="text-[10px]">链 {{ chainIdx + 1 }}</Badge>
+                <Badge
+                  v-if="batchMode && batch.loraAxisState[l.node_id]?.enabled"
+                  variant="default"
+                  class="text-[10px]"
+                >
+                  扫参 {{ batch.loraAxisState[l.node_id]?.sweepRole || '?' }}
+                </Badge>
+              </div>
             </div>
           </div>
-          <label v-if="batchMode" class="flex shrink-0 items-center gap-2 text-xs">
-            <span class="text-muted-foreground">扫参</span>
-            <Switch
-              :model-value="!!batch.loraAxisState[l.node_id]?.enabled"
+          <div class="flex shrink-0 items-center gap-1">
+            <label v-if="batchMode" class="flex items-center gap-2 text-xs">
+              <span class="text-muted-foreground">扫参</span>
+              <Switch
+                :model-value="!!batch.loraAxisState[l.node_id]?.enabled"
+                size="sm"
+                :disabled="disabled"
+                @update:model-value="batch.toggleLoraSweep(l.node_id, $event)"
+              />
+            </label>
+            <IconDeleteButton
+              v-if="manageChain"
               size="sm"
+              title="移除 LoRA"
               :disabled="disabled"
-              @update:model-value="batch.toggleLoraSweep(l.node_id, $event)"
+              @click="onRemove(l.node_id)"
             />
-          </label>
-          <Button
-            v-else-if="manageChain"
-            variant="ghost"
-            size="sm"
-            class="h-7 shrink-0 px-2 text-xs text-destructive hover:text-destructive"
-            :disabled="disabled"
-            @click="$emit('remove', l.node_id)"
-          >
-            移除
-          </Button>
+          </div>
         </div>
 
         <LoraModelPicker
           class="flex-1 min-h-0"
           block-class="h-full"
-          :key="`lora-picker-${l.node_id}-${app.restoreEpoch}`"
+          :key="`lora-picker-${l.node_id}`"
           :show-label="false"
           :model-value="loraFileName(l)"
           :options="app.modelLists.loras"
@@ -188,6 +259,7 @@ function onPickLora(name) {
           :lora-compat-map="loraCompat.compatMap"
           :missing-value="
             !batchMode &&
+            !l.session_only &&
             app.modelSelectMissing(l.node_id, { key: 'lora_name', value: l.lora_name })
           "
           :disabled="disabled || app.modelsLoading"
@@ -272,8 +344,36 @@ function onPickLora(name) {
           @update:clip="patchSingle(l.node_id, 'strength_clip', $event)"
         />
       </article>
+
+      <button
+        v-if="manageChain"
+        type="button"
+        class="lora-chain-card group flex min-h-[220px] w-full min-w-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/90 bg-muted/5 p-4 text-center transition-colors duration-150 hover:border-primary/45 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:pointer-events-none disabled:opacity-45"
+        :disabled="!canAdd"
+        aria-label="添加 LoRA"
+        @click="openPickDialog"
+      >
+        <span
+          class="flex h-14 w-14 items-center justify-center rounded-full border border-border/80 bg-background/80 text-muted-foreground transition-transform duration-150 group-hover:scale-105 group-hover:border-primary/40 group-hover:text-primary"
+        >
+          <Plus class="h-9 w-9 stroke-[1.75]" />
+        </span>
+        <span class="text-sm font-medium text-muted-foreground group-hover:text-foreground">
+          添加 LoRA
+        </span>
+      </button>
     </div>
 
-    <LoraPickDialog v-model:open="pickOpen" @pick="onPickLora" />
+    <LoraModelPicker
+      v-model:picker-open="pickOpen"
+      dialog-only
+      :show-label="false"
+      :options="app.modelLists.loras"
+      :catalog="app.modelLists.loraCatalog"
+      :lora-compat-map="loraCompat.compatMap"
+      :loading="app.modelsLoading"
+      :disabled="app.modelsLoading"
+      @picked="onPickLora"
+    />
   </div>
 </template>

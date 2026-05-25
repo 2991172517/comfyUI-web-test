@@ -170,13 +170,10 @@ def set_prompt_preference(
 
 def category_prompt_count(category_id: str) -> int:
     ensure_index()
-    res = index.list_prompts_in_category(
+    return index.count_prompts_in_category_subtree(
         Path(VOCABULARY_DB_PATH),
         category_id,
-        offset=0,
-        limit=1,
     )
-    return int(res.get("total") or 0)
 
 
 def delete_category(*, category_id: str) -> dict:

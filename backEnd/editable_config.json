@@ -7,7 +7,21 @@
     },
     {
       "class_types": ["KSampler"],
-      "fields": ["seed", "steps", "cfg", "sampler_name", "scheduler"],
+      "fields": ["seed", "steps", "cfg", "denoise", "sampler_name", "scheduler"],
+      "group": "采样"
+    },
+    {
+      "class_types": ["KSampler (Efficient)", "KSampler Adv. (Efficient)"],
+      "fields": [
+        "seed",
+        "noise_seed",
+        "steps",
+        "cfg",
+        "denoise",
+        "sampler_name",
+        "scheduler",
+        "add_noise"
+      ],
       "group": "采样"
     },
     {

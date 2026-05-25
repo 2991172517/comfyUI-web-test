@@ -11,7 +11,12 @@ from batch_prompt_service import normalize_batch_prompts
 from global_prompt_config_service import global_as_runtime_layers, load_global_prompt_config
 from prompt_defaults_service import load_defaults
 from prompt_merge_service import merge_text_append, patch_prompt_encode_text, resolve_encode_nodes
-from reference_pick_service import join_prompt_tokens, merge_deduped_core_with_random, pick_random_groups
+from reference_pick_service import (
+    join_prompt_tokens,
+    merge_deduped_core_with_random,
+    pick_random_bundle_groups,
+    pick_random_groups,
+)
 
 
 def normalize_prompt_layers(raw: dict | None) -> dict[str, Any]:
@@ -61,11 +66,25 @@ def _runtime_fixed_parts(layer: dict, side: str) -> tuple[str, str]:
     return str(fixed.get("prefix", "")).strip(), str(fixed.get("suffix", "")).strip()
 
 
+def _encode_text_in_overrides(overrides: dict | None, encode: dict[str, str], side: str) -> bool:
+    """工作流 overrides 已写入 CLIP 全文时，不再叠当次 positive/negative 或 fixed。"""
+    nid = encode.get(side)
+    if not nid:
+        return False
+    return bool(str((overrides or {}).get(str(nid), {}).get("text", "")).strip())
+
+
 def _enabled_random_groups(layer: dict | None) -> list[dict]:
     """随机组：不依赖全局「启用」总开关（总开关只控制正/负全文块）。"""
     if not layer:
         return []
     return [g for g in (layer.get("random_groups") or []) if g.get("enabled", True)]
+
+
+def _enabled_random_bundle_groups(layer: dict | None) -> list[dict]:
+    if not layer:
+        return []
+    return [g for g in (layer.get("random_bundle_groups") or []) if g.get("enabled", True)]
 
 
 def _pick_random_lines(groups: list[dict], *, seed: int | None, index: int) -> dict[str, list[str]]:
@@ -232,6 +251,15 @@ def collect_all_random_groups(runtime_raw: dict | None) -> list[dict]:
     return groups
 
 
+def collect_all_random_bundle_groups(runtime_raw: dict | None) -> list[dict]:
+    global_layer, runtime_layer = resolve_effective_layers(runtime_raw, include_global=True)
+    groups: list[dict] = []
+    groups.extend(_enabled_random_bundle_groups(global_layer))
+    if runtime_layer:
+        groups.extend(_enabled_random_bundle_groups(runtime_layer))
+    return groups
+
+
 def build_merged_encode_texts(
     workflow_id: str,
     overrides: dict[str, dict[str, Any]] | None,
@@ -279,6 +307,11 @@ def build_merged_encode_texts(
     if runtime_layer:
         all_groups.extend(_enabled_random_groups(runtime_layer))
 
+    all_bundle_groups: list[dict] = []
+    all_bundle_groups.extend(_enabled_random_bundle_groups(global_layer))
+    if runtime_layer:
+        all_bundle_groups.extend(_enabled_random_bundle_groups(runtime_layer))
+
     debug: dict[str, str] = {}
     if frozen_random_frags is not None:
         random_lines = {
@@ -290,7 +323,17 @@ def build_merged_encode_texts(
     else:
         random_lines = _pick_random_lines(all_groups, seed=seed, index=index)
         _, pick_records = pick_random_groups(all_groups, seed=seed, index=index)
+        bundle_frags, bundle_records = pick_random_bundle_groups(
+            all_bundle_groups, seed=seed, index=index
+        )
+        for side in ("positive", "negative"):
+            for line in bundle_frags.get(side) or []:
+                s = str(line).strip()
+                if s:
+                    random_lines.setdefault(side, []).append(s)
+        pick_records = list(pick_records) + list(bundle_records)
         debug["random_mode"] = "per_pick"
+        debug["random_bundle_groups"] = str(len(all_bundle_groups))
 
     preview_segments: dict[str, list[dict[str, str]]] | None = (
         {"positive": [], "negative": []} if include_segments else None
@@ -298,8 +341,15 @@ def build_merged_encode_texts(
     merged: dict[str, str] = {}
     for side in ("positive", "negative"):
         g_text = str(global_layer.get(side, "")) if _layer_enabled(global_layer) else ""
-        r_text = str(runtime_layer.get(side, "")) if runtime_layer else ""
+        encode_has_text = _encode_text_in_overrides(overrides, encode, side)
+        r_text = (
+            ""
+            if encode_has_text
+            else (str(runtime_layer.get(side, "")) if runtime_layer else "")
+        )
         pre, suf = _runtime_fixed_parts(runtime_layer or {}, side)
+        if encode_has_text:
+            pre, suf = "", ""
         core_text = merge_side_text(
             workflow_text=workflow_texts.get(side, ""),
             global_text=g_text,
@@ -475,6 +525,6 @@ def build_queued_api_prompt(
         workflow_id,
         overrides or {},
         style_enabled=style_enabled,
-        apply_defaults=True,
+        apply_defaults=False,
     )
     return prompt, []

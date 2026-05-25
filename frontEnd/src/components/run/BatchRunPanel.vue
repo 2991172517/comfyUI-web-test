@@ -4,7 +4,7 @@ import { useAppStore } from '@/stores/useAppStore.js'
 import { useBatchStore } from '@/stores/useBatchStore.js'
 import Label from '@/components/ui/Label.vue'
 import Input from '@/components/ui/Input.vue'
-import SelectNative from '@/components/ui/SelectNative.vue'
+import DirectionToggle from '@/components/ui/DirectionToggle.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Slider from '@/components/ui/Slider.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -147,10 +147,10 @@ function patchFixed(nodeId, key, val) {
             </div>
             <div class="space-y-1.5">
               <Label>方向</Label>
-              <SelectNative v-model="batch.loraAxisState[l.node_id].direction" :disabled="disabled">
-                <option value="up">累加 ↑</option>
-                <option value="down">累减 ↓</option>
-              </SelectNative>
+              <DirectionToggle
+                v-model="batch.loraAxisState[l.node_id].direction"
+                :disabled="disabled"
+              />
             </div>
             <div class="space-y-1.5">
               <Label>档位数</Label>

@@ -1,13 +1,14 @@
 <script setup>
 import { nextTick, ref, watch } from 'vue'
 import { gsap, prefersReducedMotion } from '@/lib/gsap/motion.js'
-import PageAlert from '@/components/layout/PageAlert.vue'
 import WorkflowRunHeader from '@/components/run/WorkflowRunHeader.vue'
 import GlobalPromptBar from '@/components/run/GlobalPromptBar.vue'
 import ModuleTabBar from '@/components/run/ModuleTabBar.vue'
 
 defineProps({
   loading: { type: Boolean, default: false },
+  /** 生成页在外层已渲染 WorkflowRunHeader 时设为 false */
+  showHeader: { type: Boolean, default: true },
 })
 
 const activeModule = ref('prompt')
@@ -27,8 +28,7 @@ watch(activeModule, async () => {
 
 <template>
   <div class="space-y-4 w-full">
-    <PageAlert />
-    <WorkflowRunHeader />
+    <WorkflowRunHeader v-if="showHeader" />
     <GlobalPromptBar />
     <ModuleTabBar v-model="activeModule" />
 

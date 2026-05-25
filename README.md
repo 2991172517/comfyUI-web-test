@@ -9,10 +9,10 @@ CustomProject/
   backEnd/            # FastAPI 编排服务 :8000
   frontEnd/           # Vue 3 + Vite + Tailwind + shadcn-vue :5173
 
-workflows/                 # API 工作流（母版 + 子工作流）
-  First_api.json           # 母版（只读，勿直接改）
-  First_api.meta.json      # 拓扑元数据（LoRA 角色 / Style 绕过规则）
-  variants/*.json          # 子工作流（可保存参数）
+workflows/                 # API 工作流
+  default_api.json         # 内置种子（新建空白工作流时复制，不在列表显示）
+  First_api.json           # 遗留模板（隐藏，仅兼容）
+  variants/*.json          # 可编辑工作流（含 *.meta.json 分类与拓扑）
 config/
   prompt_defaults.json     # 全局默认正/负提示追加
 ```
@@ -35,8 +35,8 @@ config/
 
 从 **`CustomProject/workflows/`** 读取（**File → Export (API)** 导出的 json）。
 
-- **母版** `First_api.json`：模板只读；控制台「保存参数」会提示另存子工作流。
-- **子工作流** `workflows/variants/{id}.json`：从母版复制，用于 LoRA / Style 调试存档。
+- **工作流** `workflows/variants/{id}.json`：按分类（文生图 / 局部重绘 / 高清放大 / 其他）管理；`*.meta.json` 记录拓扑与 LoRA 槽位。
+- **新建**：选分类，可选从现有工作流复制，否则从 `default_api` 最小模板创建。
 - **Style**：当前实现为链末 LoRA `#16`；关闭时运行时绕过（model / 负向 CLIP 改接 `#15`）。元数据预留「正向 CLIP → Style 节点 → KSampler①」的 conditioning 扩展位。
 
 也仍支持 UI 格式 json（若放入该目录），提交时会自动转换为 API；推荐统一使用 API 导出文件。

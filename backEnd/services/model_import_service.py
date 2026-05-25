@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote, urlparse
 
-from config import COMFYUI_ROOT, MODEL_PREVIEW_EXTENSIONS
+from config import MODEL_PREVIEW_EXTENSIONS
+import model_paths_service
 from model_parser.http_client import download_file, get_bytes
 from model_parser.media_utils import is_static_image_url, is_video_url
 from model_parser.source_url_utils import format_with_source_url
@@ -16,16 +17,14 @@ from services import import_job_store
 
 log = logging.getLogger("custom_project.model_import")
 
-VALID_FOLDERS = frozenset({"checkpoints", "loras"})
+VALID_FOLDERS = model_paths_service.VALID_FOLDERS
 MAX_PREVIEW_IMAGES = 3
 
 ProgressFn = Callable[[dict[str, Any]], None]
 
 
 def models_dir(folder: str) -> Path:
-    if folder not in VALID_FOLDERS:
-        raise ValueError(f"不支持的目录: {folder}")
-    return COMFYUI_ROOT / "models" / folder
+    return model_paths_service.resolve_folder_path(folder)
 
 
 def _safe_filename(name: str) -> str:

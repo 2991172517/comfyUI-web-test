@@ -113,16 +113,16 @@ async function onExportConfirm({ mode, name, description }) {
         class="text-sm font-medium text-muted-foreground hover:text-foreground mb-2"
         @click="configEditOpen = !configEditOpen"
       >
-        {{ configEditOpen ? '收起' : '展开' }}编辑固定 / 随机组
+        {{ configEditOpen ? '收起' : '展开' }}编辑随机组
       </button>
       <AnimatedCollapse v-model="configEditOpen">
         <PromptConfigEditor
-          :fixed="store.sessionPrompts.fixed"
           :random-groups="store.sessionPrompts.random_groups"
+          :random-bundle-groups="store.sessionPrompts.random_bundle_groups"
           :disabled="disabled"
           compact
-          @update:fixed="store.sessionPrompts.fixed = $event"
           @update:random-groups="store.sessionPrompts.random_groups = $event"
+          @update:random-bundle-groups="store.sessionPrompts.random_bundle_groups = $event"
         />
       </AnimatedCollapse>
       <button

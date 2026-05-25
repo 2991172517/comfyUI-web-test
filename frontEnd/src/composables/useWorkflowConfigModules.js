@@ -4,4 +4,5 @@ export const WORKFLOW_CONFIG_MODULES = [
   { id: 'checkpoint', label: 'Checkpoint' },
   { id: 'lora', label: 'LoRA' },
   { id: 'other', label: '其他' },
+  { id: 'preview', label: '总体预览' },
 ]

@@ -35,7 +35,7 @@ const syncClip = ref(true)
 const hasStyleSlot = computed(() =>
   essentials.value?.lora_chain?.some((l) => l.role === 'style'),
 )
-const readOnly = computed(() => !!essentials.value?.is_master)
+const readOnly = computed(() => false)
 
 async function load() {
   if (!props.workflowId) return
@@ -133,10 +133,6 @@ function goGenerate() {
 
 <template>
   <div v-if="loading" class="text-sm text-muted-foreground py-8 text-center">加载配置…</div>
-
-  <Alert v-else-if="readOnly" variant="default" class="mb-4">
-    母版只读。请从左侧创建子工作流后再编辑 Checkpoint / LoRA / Style。
-  </Alert>
 
   <div v-else-if="essentials" class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">

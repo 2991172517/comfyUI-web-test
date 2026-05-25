@@ -27,6 +27,11 @@ def get_tracker_state(prompt_id: str) -> dict[str, Any]:
         return dict(_states.get(prompt_id, {}))
 
 
+def list_tracker_states() -> dict[str, dict[str, Any]]:
+    with _lock:
+        return {pid: dict(st) for pid, st in _states.items()}
+
+
 def clear_tracker_state(prompt_id: str) -> None:
     with _lock:
         _states.pop(prompt_id, None)
@@ -54,6 +59,35 @@ def register_prompt_watch(prompt_id: str, node_ids: list[str] | None) -> None:
     )
 
 
+def register_execution_track(prompt_id: str, node_ids: list[str] | None) -> None:
+    """登记本次实际执行的节点顺序（与总体预览进度条一致）。"""
+    ordered = [str(n).strip() for n in (node_ids or []) if str(n).strip()]
+    _update(
+        prompt_id,
+        execution_track_nodes=ordered,
+        completed_nodes=[],
+    )
+
+
+def _append_completed_node(entry: dict, node_id: str | None) -> None:
+    if not node_id:
+        return
+    done: list[str] = list(entry.get("completed_nodes") or [])
+    nid = str(node_id)
+    if nid not in done:
+        done.append(nid)
+    entry["completed_nodes"] = done
+
+
+def _mark_node_completed(prompt_id: str, node_id: str | None) -> None:
+    if not node_id:
+        return
+    with _lock:
+        entry = _states.get(prompt_id)
+        if entry:
+            _append_completed_node(entry, node_id)
+
+
 def _note_executing_node(prompt_id: str, node: str) -> None:
     with _lock:
         entry = _states.get(prompt_id)
@@ -69,15 +103,25 @@ def _update(prompt_id: str, **fields: Any) -> None:
     with _lock:
         entry = _states.setdefault(prompt_id, {})
         entry.update(fields)
+        snapshot = dict(entry)
+    try:
+        import job_events_hub
+
+        job_events_hub.broadcast_job_sync(prompt_id, snapshot)
+    except Exception:
+        pass
 
 
 def start_tracking(
     client_id: str,
     prompt_id: str,
     prompt_node_ids: list[str] | None = None,
+    execution_node_ids: list[str] | None = None,
 ) -> None:
     """后台线程监听 ComfyUI WS，更新任务进度。"""
     register_prompt_watch(prompt_id, prompt_node_ids)
+    if execution_node_ids is not None:
+        register_execution_track(prompt_id, execution_node_ids)
 
     def run() -> None:
         try:
@@ -86,13 +130,26 @@ def start_tracking(
             logger.warning("websocket-client 未安装，进度追踪不可用")
             return
 
-        _update(
-            prompt_id,
-            status="pending",
-            current_node=None,
-            progress=None,
-            error=None,
-        )
+        with _lock:
+            entry = _states.get(prompt_id)
+            had_track = bool(entry and entry.get("execution_track_nodes"))
+        if not had_track:
+            _update(
+                prompt_id,
+                status="pending",
+                current_node=None,
+                progress=None,
+                error=None,
+                completed_nodes=[],
+            )
+        else:
+            _update(
+                prompt_id,
+                status="pending",
+                current_node=None,
+                progress=None,
+                error=None,
+            )
         if prompt_node_ids:
             register_prompt_watch(prompt_id, prompt_node_ids)
 
@@ -128,6 +185,12 @@ def start_tracking(
                         continue
                     node = data.get("node")
                     if node is None:
+                        with _lock:
+                            entry = _states.get(prompt_id)
+                            if entry and entry.get("current_node"):
+                                _append_completed_node(
+                                    entry, entry.get("current_node")
+                                )
                         _update(
                             prompt_id,
                             status="finalizing",
@@ -135,6 +198,12 @@ def start_tracking(
                         )
                         break
                     node_str = str(node)
+                    with _lock:
+                        entry = _states.get(prompt_id)
+                        if entry:
+                            prev = entry.get("current_node")
+                            if prev and str(prev) != node_str:
+                                _append_completed_node(entry, prev)
                     _update(
                         prompt_id,
                         status="in_progress",
